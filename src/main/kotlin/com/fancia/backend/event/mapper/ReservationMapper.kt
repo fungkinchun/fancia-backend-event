@@ -1,14 +1,10 @@
 package com.fancia.backend.event.mapper
 
-import com.fancia.backend.event.core.dto.CreateReservationRequest
-import com.fancia.backend.event.core.dto.ReservationResponse
-import com.fancia.backend.event.core.dto.UpdateReservationRequest
 import com.fancia.backend.event.core.entity.Reservation
-import org.mapstruct.Mapper
-import org.mapstruct.Mapping
-import org.mapstruct.MappingTarget
-import org.mapstruct.NullValueMappingStrategy
-import org.mapstruct.ReportingPolicy
+import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
+import com.fancia.backend.shared.event.core.dto.ReservationResponse
+import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
+import org.mapstruct.*
 
 @Mapper(
     componentModel = "spring",
@@ -26,6 +22,7 @@ interface ReservationMapper {
     fun toBean(reservation: CreateReservationRequest): Reservation
     fun toBean(reservation: UpdateReservationRequest): Reservation
     fun toBean(request: UpdateReservationRequest, @MappingTarget target: Reservation): Reservation
+
     @Mapping(target = "id.eventId", source = "eventId")
     @Mapping(target = "id.userId", source = "userId")
     fun toBean(response: ReservationResponse): Reservation

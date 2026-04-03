@@ -1,17 +1,17 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.dto.CreateReservationRequest
-import com.fancia.backend.event.core.dto.ReservationResponse
-import com.fancia.backend.event.core.dto.UpdateReservationRequest
 import com.fancia.backend.event.core.entity.EventRole
 import com.fancia.backend.event.core.entity.ReservationId
-import com.fancia.backend.event.core.entity.ReservationStatus
-import com.fancia.backend.event.core.exception.*
 import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
 import com.fancia.backend.event.mapper.ReservationMapper
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
+import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
+import com.fancia.backend.shared.event.core.dto.ReservationResponse
+import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
+import com.fancia.backend.shared.event.core.enums.ReservationStatus
+import com.fancia.backend.shared.event.core.exception.*
 import jakarta.validation.Valid
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.oauth2.jwt.Jwt

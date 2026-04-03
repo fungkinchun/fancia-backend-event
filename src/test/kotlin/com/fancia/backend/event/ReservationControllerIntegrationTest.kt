@@ -1,10 +1,12 @@
 package com.fancia.backend.event
 
-import com.fancia.backend.event.core.dto.ReservationResponse
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.entity.Reservation
 import com.fancia.backend.event.core.repository.ReservationRepository
+import com.fancia.backend.event.mapper.EventMapper
 import com.fancia.backend.event.mapper.ReservationMapper
+import com.fancia.backend.shared.event.core.dto.EventResponse
+import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import org.hamcrest.CoreMatchers.`is`
@@ -30,7 +32,8 @@ import java.util.*
 class ReservationControllerIntegrationTest(
     private val mockMvc: MockMvc,
     private val reservationRepository: ReservationRepository,
-    private val objectMapper: JsonMapper,
+    private val jsonMapper: JsonMapper,
+    private val eventMapper: EventMapper,
     private val reservationMapper: ReservationMapper
 ) : FunSpec({
     test("should create a new event") {
@@ -49,7 +52,7 @@ class ReservationControllerIntegrationTest(
                     "interestGroupId" to testInterestGroupId,
                     "tags" to listOf("good")
                 )
-                content = objectMapper.writeValueAsString(requestBody)
+                content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
             }
@@ -59,7 +62,7 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.name", `is`("testEvent"))
                 jsonPath("$.id", `is`(notNullValue()))
             }
-        val createdEvent = response.toEvent(objectMapper)
+        val createdEvent = response.toEvent(jsonMapper, eventMapper)
         val createReservationResponse = mockMvc
             .post("/api/reservations") {
                 with(jwt().jwt {
@@ -68,9 +71,9 @@ class ReservationControllerIntegrationTest(
                 val requestBody = mapOf(
                     "eventId" to createdEvent.id,
                     "guests" to 0,
-                    "payload" to objectMapper.writeValueAsString(mapOf("extraInfo" to "string")),
+                    "payload" to jsonMapper.writeValueAsString(mapOf("extraInfo" to "string")),
                 )
-                content = objectMapper.writeValueAsString(requestBody)
+                content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
             }
@@ -82,7 +85,7 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.status", `is`("PENDING"))
             }
         val found = reservationRepository.existsByIdEventIdAndIdUserId(createdEvent.id!!, testUserId)
-       found shouldBe true
+        found shouldBe true
 
         mockMvc.patch("/api/reservations/event/{eventId}/user/{userId}", createdEvent.id, testUserId) {
             with(jwt().jwt {
@@ -90,10 +93,10 @@ class ReservationControllerIntegrationTest(
             })
             val requestBody = mapOf(
                 "guests" to 0,
-                "payload" to objectMapper.writeValueAsString(mapOf("extraInfo" to "string")),
+                "payload" to jsonMapper.writeValueAsString(mapOf("extraInfo" to "string")),
                 "status" to "ACCEPTED"
             )
-            content = objectMapper.writeValueAsString(requestBody)
+            content = jsonMapper.writeValueAsString(requestBody)
             contentType = APPLICATION_JSON
             accept = APPLICATION_JSON
         }
@@ -111,20 +114,24 @@ class ReservationControllerIntegrationTest(
     }
 })
 
-private fun ResultActionsDsl.toEvent(objectMapper: JsonMapper): Event =
+private fun ResultActionsDsl.toEvent(jsonMapper: JsonMapper, eventMapper: EventMapper): Event =
     andReturn()
         .response
         .contentAsString
-        .let { objectMapper.readValue(it, object : TypeReference<Event>() {}) }
+        .let {
+            jsonMapper.readValue(it, object : TypeReference<EventResponse>() {}).let(
+                eventMapper::toBean
+            )
+        }
 
 private fun ResultActionsDsl.toReservation(
-    objectMapper: JsonMapper,
+    jsonMapper: JsonMapper,
     reservationMapper: ReservationMapper
 ): Reservation =
     andReturn()
         .response
         .contentAsString
         .let {
-            objectMapper.readValue(it, object : TypeReference<ReservationResponse>() {})
+            jsonMapper.readValue(it, object : TypeReference<ReservationResponse>() {})
                 .let(reservationMapper::toBean)
         }

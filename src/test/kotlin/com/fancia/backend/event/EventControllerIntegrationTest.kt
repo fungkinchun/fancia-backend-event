@@ -2,6 +2,9 @@ package com.fancia.backend.event
 
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.event.mapper.EventMapper
+import com.fancia.backend.shared.event.core.dto.EventResponse
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import org.hamcrest.CoreMatchers.`is`
@@ -17,6 +20,7 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.wiremock.integrations.testcontainers.WireMockContainer
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.json.JsonMapper
 import java.util.*
@@ -27,12 +31,45 @@ import java.util.*
 @Import(TestConfig::class)
 class EventControllerIntegrationTest(
     private val mockMvc: MockMvc,
+    private val wiremock: WireMockContainer,
     private val eventRepository: EventRepository,
-    private var objectMapper: JsonMapper
+    private val jsonMapper: JsonMapper,
+    private val eventMapper: EventMapper
 ) : FunSpec({
+    beforeSpec {
+        configureFor(
+            wiremock.host,
+            wiremock.getMappedPort(8080)
+        )
+    }
     test("should create a new event") {
         val testUserId = UUID.randomUUID()
         val testInterestGroupId = UUID.randomUUID()
+        val mockResponse = mapOf(
+            "content" to listOf(
+                mapOf(
+                    "name" to "good"
+                )
+            ),
+            "totalElements" to 1,
+            "totalPages" to 1,
+            "size" to 20,
+            "number" to 0
+        )
+        stubFor(
+            get(urlPathEqualTo("/api/tags"))
+                .withQueryParam("search", equalTo("good"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            jsonMapper.writeValueAsString(
+                                mockResponse
+                            )
+                        )
+                )
+        )
         val response = mockMvc
             .post("/api/events") {
                 with(jwt().jwt {
@@ -46,7 +83,7 @@ class EventControllerIntegrationTest(
                     "interestGroupId" to testInterestGroupId,
                     "tags" to listOf("good")
                 )
-                content = objectMapper.writeValueAsString(requestBody)
+                content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
             }
@@ -56,7 +93,7 @@ class EventControllerIntegrationTest(
                 jsonPath("$.name", `is`("testEvent"))
                 jsonPath("$.id", `is`(notNullValue()))
             }
-        val createdEvent = response.toEvent(objectMapper)
+        val createdEvent = response.toEvent(jsonMapper, eventMapper)
         val found = eventRepository.findByIdOrNull(createdEvent.id!!)
         createdEvent shouldBe found
     }
@@ -92,8 +129,12 @@ class EventControllerIntegrationTest(
     }
 })
 
-private fun ResultActionsDsl.toEvent(objectMapper: JsonMapper): Event =
+private fun ResultActionsDsl.toEvent(jsonMapper: JsonMapper, eventMapper: EventMapper): Event =
     andReturn()
         .response
         .contentAsString
-        .let { objectMapper.readValue(it, object : TypeReference<Event>() {}) }
+        .let {
+            jsonMapper.readValue(it, object : TypeReference<EventResponse>() {}).let(
+                eventMapper::toBean
+            )
+        }

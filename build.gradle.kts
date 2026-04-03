@@ -24,11 +24,15 @@ kotlin {
 
 fun RepositoryHandler.codeArtifactRepo(repoName: String) {
     maven {
-        val baseUrl = System.getenv("ARTIFACT_REPO_URL") ?: project.findProperty("ARTIFACT_REPO_URL") as String? ?: error("ARTIFACT_REPO_URL must be provided via environment variable or project property")
+        val baseUrl = System.getenv("ARTIFACT_REPO_URL") ?: project.findProperty("ARTIFACT_REPO_URL") as String?
+        ?: error("ARTIFACT_REPO_URL must be provided via environment variable or project property")
         url = uri("$baseUrl/$repoName/")
         credentials {
-            username = System.getenv("ARTIFACT_REPO_USER") ?: project.findProperty("ARTIFACT_REPO_USER") as String? ?: error("ARTIFACT_REPO_USER must be provided")
-            password = System.getenv("ARTIFACT_REPO_PASSWORD") ?: project.findProperty("ARTIFACT_REPO_PASSWORD") as String? ?: error("ARTIFACT_REPO_PASSWORD must be provided")
+            username = System.getenv("ARTIFACT_REPO_USER") ?: project.findProperty("ARTIFACT_REPO_USER") as String?
+                    ?: error("ARTIFACT_REPO_USER must be provided")
+            password =
+                System.getenv("ARTIFACT_REPO_PASSWORD") ?: project.findProperty("ARTIFACT_REPO_PASSWORD") as String?
+                        ?: error("ARTIFACT_REPO_PASSWORD must be provided")
         }
     }
 }
@@ -37,6 +41,7 @@ repositories {
     mavenCentral()
     maven { url = uri("https://repo.spring.io/snapshot") }
     codeArtifactRepo("fancia-backend-shared-common")
+    codeArtifactRepo("fancia-backend-shared-event")
     codeArtifactRepo("fancia-backend-shared-user")
 }
 dependencyManagement {
@@ -68,6 +73,7 @@ dependencies {
     implementation("com.amazonaws.secretsmanager:aws-secretsmanager-jdbc:2.0.4")
     implementation("com.fancia.backend.shared:common:0.0.1-SNAPSHOT")
     implementation("com.fancia.backend.shared:user:0.0.1-SNAPSHOT")
+    implementation("com.fancia.backend.shared:event:0.0.1-SNAPSHOT")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.1")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1")
     implementation("org.springdoc:springdoc-openapi-starter-common:3.0.1")

@@ -1,9 +1,9 @@
 package com.fancia.backend.event.core.controller
 
-import com.fancia.backend.event.core.dto.CreateReservationRequest
-import com.fancia.backend.event.core.dto.ReservationResponse
-import com.fancia.backend.event.core.dto.UpdateReservationRequest
 import com.fancia.backend.event.core.service.ReservationService
+import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
+import com.fancia.backend.shared.event.core.dto.ReservationResponse
+import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses

@@ -1,9 +1,9 @@
 package com.fancia.backend.event.core.controller
 
-import com.fancia.backend.event.core.dto.CreateEventRequest
-import com.fancia.backend.event.core.dto.EventResponse
-import com.fancia.backend.event.core.dto.UpdateEventRequest
 import com.fancia.backend.event.core.service.EventService
+import com.fancia.backend.shared.event.core.dto.CreateEventRequest
+import com.fancia.backend.shared.event.core.dto.EventResponse
+import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
