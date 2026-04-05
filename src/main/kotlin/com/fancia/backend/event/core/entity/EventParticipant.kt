@@ -1,5 +1,6 @@
 package com.fancia.backend.event.core.entity
 
+import com.fancia.backend.shared.event.core.enums.EventRole
 import jakarta.persistence.*
 import java.util.*
 

@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*
 import java.util.*
 
 @RestController
-@RequestMapping("/api/reservations")
+@RequestMapping("/api/events")
 @Tag(name = "Reservations", description = "Reservation endpoints")
 @SecurityRequirement(name = "bearerAuth")
 class ReservationController(
@@ -31,15 +31,16 @@ class ReservationController(
             ApiResponse(responseCode = "200", description = "Reservation created"),
         ]
     )
-    @PostMapping
+    @PostMapping("/{eventId}/reservations")
     fun createReservation(
+        @PathVariable eventId: UUID,
         @RequestBody request: CreateReservationRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ResponseEntity<ReservationResponse> {
-        return ResponseEntity.ok(reservationService.create(request, jwt))
+        return ResponseEntity.ok(reservationService.create(eventId, request, jwt))
     }
 
-    @PatchMapping("/event/{eventId}/user/{userId}")
+    @PatchMapping("/{eventId}/users/{userId}/reservations")
     fun updateReservation(
         @PathVariable eventId: UUID,
         @PathVariable userId: UUID,

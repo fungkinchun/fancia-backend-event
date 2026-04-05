@@ -16,10 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
-import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.ResultActionsDsl
-import org.springframework.test.web.servlet.patch
-import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.*
 import org.testcontainers.junit.jupiter.Testcontainers
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.json.JsonMapper
@@ -34,7 +31,6 @@ class ReservationControllerIntegrationTest(
     private val reservationRepository: ReservationRepository,
     private val jsonMapper: JsonMapper,
     private val eventMapper: EventMapper,
-    private val reservationMapper: ReservationMapper
 ) : FunSpec({
     test("should create a new event") {
         val testUserId = UUID.randomUUID()
@@ -64,7 +60,7 @@ class ReservationControllerIntegrationTest(
             }
         val createdEvent = response.toEvent(jsonMapper, eventMapper)
         val createReservationResponse = mockMvc
-            .post("/api/reservations") {
+            .post("/api/events/{eventId}/reservations", createdEvent.id) {
                 with(jwt().jwt {
                     it.claim("userId", testUserId)
                 })
@@ -87,7 +83,7 @@ class ReservationControllerIntegrationTest(
         val found = reservationRepository.existsByIdEventIdAndIdUserId(createdEvent.id!!, testUserId)
         found shouldBe true
 
-        mockMvc.patch("/api/reservations/event/{eventId}/user/{userId}", createdEvent.id, testUserId) {
+        mockMvc.patch("/api/events/{eventId}/users/{userId}/reservations", createdEvent.id, testUserId) {
             with(jwt().jwt {
                 it.claim("userId", testUserId)
             })
@@ -106,6 +102,69 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.eventId", `is`(createdEvent.id.toString()))
                 jsonPath("$.userId", `is`(testUserId.toString()))
                 jsonPath("$.status", `is`("ACCEPTED"))
+            }
+        val testParticipantId = UUID.randomUUID()
+        mockMvc.post("/api/events/{eventId}/reservations", createdEvent.id) {
+            with(jwt().jwt {
+                it.claim("userId", testParticipantId)
+            })
+            val requestBody = mapOf(
+                "eventId" to createdEvent.id,
+                "guests" to 0,
+                "payload" to jsonMapper.writeValueAsString(mapOf("extraInfo" to "string")),
+            )
+            content = jsonMapper.writeValueAsString(requestBody)
+            contentType = APPLICATION_JSON
+            accept = APPLICATION_JSON
+        }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.eventId", `is`(createdEvent.id.toString()))
+                jsonPath("$.userId", `is`(testParticipantId.toString()))
+                jsonPath("$.status", `is`("PENDING"))
+            }
+
+        mockMvc.get("/api/events/{eventId}/participants", createdEvent.id) {
+            with(jwt().jwt {
+                it.claim("userId", testUserId)
+            })
+            accept = APPLICATION_JSON
+        }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(1))
+            }
+
+        mockMvc.patch("/api/events/{eventId}/users/{userId}/reservations", createdEvent.id, testParticipantId) {
+            with(jwt().jwt {
+                it.claim("userId", testUserId)
+            })
+            val requestBody = mapOf(
+                "guests" to 0,
+                "payload" to jsonMapper.writeValueAsString(mapOf("extraInfo" to "string")),
+                "status" to "ACCEPTED"
+            )
+            content = jsonMapper.writeValueAsString(requestBody)
+            contentType = APPLICATION_JSON
+            accept = APPLICATION_JSON
+        }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+            }
+
+        mockMvc.get("/api/events/{eventId}/participants", createdEvent.id) {
+            with(jwt().jwt {
+                it.claim("userId", testUserId)
+            })
+            accept = APPLICATION_JSON
+        }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(2))
             }
     }
 

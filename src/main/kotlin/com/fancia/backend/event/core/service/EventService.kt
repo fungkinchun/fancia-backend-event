@@ -2,7 +2,6 @@ package com.fancia.backend.event.core.service
 
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.entity.EventParticipant
-import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.mapper.EventMapper
@@ -10,6 +9,7 @@ import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationExce
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
+import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -30,11 +30,11 @@ class EventService(
 
     @Transactional
     fun create(request: @Valid CreateEventRequest, jwt: Jwt): EventResponse {
-        val userId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         eventMapper.toBean(request).let {
-            it.createdBy = userId
-            val createdBy = EventParticipant(userId = userId)
+            it.createdBy = requesterId
+            val createdBy = EventParticipant(userId = requesterId)
             createdBy.event = it
             it.participants.add(createdBy)
             val response = commonServiceClient.getTags(request.tags)
@@ -46,9 +46,9 @@ class EventService(
 
     @Transactional
     fun update(id: UUID, request: @Valid UpdateEventRequest, jwt: Jwt): EventResponse {
-        val userId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        val event = findByIdAndCreatedBy(id, userId) ?: throw EventNotFoundException(id)
+        val event = findByIdAndCreatedBy(id, requesterId) ?: throw EventNotFoundException(id)
         return eventRepository.save(eventMapper.toBean(request, event)).let(eventMapper::toDto)
     }
 

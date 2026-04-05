@@ -64,7 +64,7 @@ class EventController(
             ApiResponse(responseCode = "200", description = "List of events returned"),
         ]
     )
-    fun listInterestGroups(
+    fun listEvents(
         @RequestParam(required = false)
         @Parameter(description = "Fuzzy search term for event name")
         name: String?,
