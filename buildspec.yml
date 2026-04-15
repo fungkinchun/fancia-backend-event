@@ -1,0 +1,44 @@
+version: 0.2
+
+env:
+  secrets-manager:
+    DOCKER_HUB_USER: "dockerhub:username"
+    DOCKER_HUB_TOKEN: "dockerhub:token"
+phases:
+  install:
+    runtime-versions:
+      java: corretto24
+    commands:
+      - echo Logging in to Amazon CodeArtifact...
+      - export ARTIFACT_REPO_URL=https://${DOMAIN_NAME}-${ACCOUNT_ID}.d.codeartifact.${AWS_REGION}.amazonaws.com/maven
+      - export ARTIFACT_REPO_USER=aws
+      - export ARTIFACT_REPO_PASSWORD=$(aws codeartifact get-authorization-token --domain $DOMAIN_NAME --domain-owner $ACCOUNT_ID --region $AWS_REGION --query authorizationToken --output text)
+      - echo "Logging in to Docker Hub..."
+      - echo "$DOCKER_HUB_TOKEN" | docker login --username "$DOCKER_HUB_USER" --password-stdin
+      - echo Installing dependencies...
+      - ./gradlew dependencies
+  pre_build:
+    commands:
+      - echo Cleaning project...
+      - ./gradlew clean
+  build:
+    commands:
+      - echo Building Kotlin project...
+      - ./gradlew build --info --stacktrace
+  post_build:
+    commands:
+      - |
+        if [ "$CODEBUILD_BUILD_SUCCEEDING" = "1" ]; then
+          echo "Logging in to Amazon ECR..."
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          echo "Build successful! Proceeding to Docker push..."
+          docker build -t $PROJECT_NAME-backend-$REPO_NAME:latest .
+          docker tag $PROJECT_NAME-backend-$REPO_NAME:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$PROJECT_NAME-backend-$REPO_NAME:latest
+          docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$PROJECT_NAME-backend-$REPO_NAME:latest
+          echo "Build and publish completed."
+        else
+          echo "Build failed in a previous phase. Skipping Docker push."
+        fi
+artifacts:
+  files:
+    - build/libs/**/*.jar

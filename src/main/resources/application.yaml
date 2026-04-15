@@ -1,0 +1,56 @@
+server:
+  servlet:
+    context-path: /${REPO_NAME}
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_SERVICE_URL:auth-service}
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${AWS_RDS_SECRET_NAME:${DATABASE_USERNAME}}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: ${DATABASE_DRIVER:com.amazonaws.secretsmanager.sql.AWSSecretsManagerPostgreSQLDriver}
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: create
+
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: ${KUBERNETES_ENABLED:true}
+    openfeign:
+      autoconfiguration:
+        jackson:
+          enabled: true
+      client:
+        config:
+          auth-service:
+            url: ${AUTH_SERVICE_URL:#{null}}
+          common-service:
+            url: ${COMMON_SERVICE_URL:#{null}}
+          user-service:
+            url: ${USER_SERVICE_URL:#{null}}
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.UUIDSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.fancia.backend.shared.user.core.message
+    bootstrap-servers: bootstrap.${DOMAIN_NAME}:9094
+
+app:
+  s3:
+    bucket-name: ${BUCKET_NAME}
+    access-key: ${BUCKET_ACCESS_KEY}
+    secret-key: ${BUCKET_SECRET_KEY}
+    base-url: ${BUCKET_ENDPOINT}
+    region: ${AWS_REGION}
+    storage-class: STANDARD
