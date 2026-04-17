@@ -38,6 +38,7 @@ phases:
           echo "Build and publish completed."
         else
           echo "Build failed in a previous phase. Skipping Docker push."
+          exit 1
         fi
 artifacts:
   files:

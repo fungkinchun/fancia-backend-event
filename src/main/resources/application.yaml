@@ -2,6 +2,10 @@ server:
   servlet:
     context-path: /${REPO_NAME}
 spring:
+  config:
+    import:
+      - aws-secretsmanager:${ENV}/${PROJECT_NAME}/smtp
+      - aws-secretsmanager:${ENV}/${PROJECT_NAME}/s3
   security:
     oauth2:
       resourceserver:
@@ -17,8 +21,21 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: create
-
+      ddl-auto: update
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            trust: smtp.gmail.com
   cloud:
     kubernetes:
       discovery:
@@ -35,6 +52,10 @@ spring:
             url: ${COMMON_SERVICE_URL:#{null}}
           user-service:
             url: ${USER_SERVICE_URL:#{null}}
+          interestgroup-service:
+            url: ${INTERESTGROUP_SERVICE_URL:#{null}}
+          event-service:
+            url: ${EVENT_SERVICE_URL:#{null}}
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.UUIDSerializer
@@ -45,8 +66,10 @@ spring:
       properties:
         spring.json.trusted.packages: com.fancia.backend.shared.user.core.message
     bootstrap-servers: bootstrap.${DOMAIN_NAME}:9094
-
 app:
+  application-name: ${PROJECT_NAME}-backend-${REPO_NAME}
+  base-url: ${DOMAIN_NAME}/${REPO_NAME}/api
+  login-page-url: ${AUTH_SERVICE_URL:auth-service}/login
   s3:
     bucket-name: ${BUCKET_NAME}
     access-key: ${BUCKET_ACCESS_KEY}
@@ -54,3 +77,12 @@ app:
     base-url: ${BUCKET_ENDPOINT}
     region: ${AWS_REGION}
     storage-class: STANDARD
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
