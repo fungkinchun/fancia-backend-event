@@ -20,6 +20,7 @@ class SecurityConfiguration {
         http.authorizeHttpRequests { customizer ->
             customizer.requestMatchers(HttpMethod.GET, "/api/events").permitAll()
             customizer.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+            customizer.requestMatchers("/actuator/**").permitAll()
             customizer.anyRequest().authenticated()
         }.oauth2ResourceServer { oauth2ResourceServer ->
             oauth2ResourceServer.jwt(Customizer.withDefaults())
