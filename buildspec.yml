@@ -34,7 +34,7 @@ phases:
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
           echo "Build successful! Proceeding to Docker push..."
           if [ "$USE_EKS" = "false" ]; then
-            DOCKERFILE="Dockerfile.lambda"
+            DOCKERFILE="lambda.Dockerfile"
             echo "Using Dockerfile for Lambda: $DOCKERFILE"
           else
             DOCKERFILE="Dockerfile"
