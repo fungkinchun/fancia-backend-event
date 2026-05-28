@@ -105,31 +105,26 @@ dependencies {
 }
 
 tasks.jar {
-    enabled = true
-    archiveClassifier.set("plain")
-}
-
-tasks.bootJar {
-    dependsOn(tasks.jar)
+    enabled = false
 }
 
 tasks.register<Zip>("lambdaZip") {
     group = "build"
-    description = "AWS Lambda deployment package (application classes at root, dependencies in lib/)"
+    description = "AWS Lambda Zip package for Lambda Web Adapter (run.sh + boot JAR)"
     archiveFileName.set("${project.name}-lambda.zip")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
     isZip64 = true
 
-    dependsOn(tasks.jar)
+    dependsOn(tasks.bootJar)
 
-    from(tasks.jar.flatMap { jar -> jar.archiveFile.map { zipTree(it) } })
-
-    into("lib") {
-        from(
-            configurations.runtimeClasspath.get().filter { file ->
-                file.isFile && file.extension.equals("jar", ignoreCase = true)
-            },
-        )
+    from(tasks.bootJar) {
+        rename { "app.jar" }
+    }
+    from("src/lambda") {
+        include("run.sh")
+        filePermissions {
+            unix("rwxr-xr-x")
+        }
     }
 }
 
