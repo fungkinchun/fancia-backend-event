@@ -47,18 +47,13 @@ phases:
             aws s3 cp build/distributions/*-lambda.zip s3://$PROJECT_NAME-$ENV-backend-artifacts/$REPO_NAME.zip
             echo "Build successful! Lambda ZIP uploaded to S3."
             FUNCTION_NAME="${PROJECT_NAME}-${ENV}-${REPO_NAME}-api"
-            if aws lambda get-function --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then
-              echo "Updating Lambda function code for ${FUNCTION_NAME}..."
-              aws lambda update-function-code \
+            aws lambda update-function-code \
                 --function-name "$FUNCTION_NAME" \
                 --s3-bucket "$PROJECT_NAME-$ENV-backend-artifacts" \
                 --s3-key "$REPO_NAME.zip"
-              echo "Publishing new Lambda version for SnapStart..."
-              PUBLISHED_VERSION=$(aws lambda publish-version --function-name "$FUNCTION_NAME" --query 'Version' --output text)
-              echo "Published Lambda version: $PUBLISHED_VERSION"
-            else
-              echo "Lambda function ${FUNCTION_NAME} not found yet. Skipping Lambda update/publish."
-            fi
+            echo "Publishing new Lambda version for SnapStart..."
+            PUBLISHED_VERSION=$(aws lambda publish-version --function-name "$FUNCTION_NAME" --query 'Version' --output text)
+            echo "Published Lambda version: $PUBLISHED_VERSION"
           fi
         else
           echo "Build failed in a previous phase. Skipping Docker push."
