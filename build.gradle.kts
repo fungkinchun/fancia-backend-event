@@ -87,6 +87,7 @@ dependencies {
     implementation("io.micrometer:micrometer-registry-prometheus:1.16.4")
     implementation("org.springframework.boot:spring-boot-starter-flyway:4.0.5")
     implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("org.crac:crac:1.5.0")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
