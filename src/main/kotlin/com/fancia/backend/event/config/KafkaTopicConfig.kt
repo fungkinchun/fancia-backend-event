@@ -10,7 +10,7 @@ class KafkaTopicConfig {
     @Bean
     fun eventsTopic(): NewTopic {
         return TopicBuilder.name("eventsTopic")
-            .partitions(3)
+            .partitions(1)
             .replicas(1)
             .build()
     }
