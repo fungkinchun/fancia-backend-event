@@ -16,7 +16,7 @@ class Event : AbstractEntity() {
     var description: String = ""
     var startTime: LocalDateTime? = null
     var duration: Duration? = null
-    var interestGroupId: UUID? = null
+    var interestGroups: MutableSet<UUID> = mutableSetOf()
 
     @OneToMany(mappedBy = "event", cascade = [CascadeType.ALL], orphanRemoval = true)
     val participants: MutableSet<EventParticipant> = mutableSetOf<EventParticipant>()

@@ -2,6 +2,7 @@ package com.fancia.backend.event.core.service
 
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.entity.EventParticipant
+import com.fancia.backend.event.core.entity.EventParticipantId
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.mapper.EventMapper
@@ -34,13 +35,21 @@ class EventService(
             ?: throw InvalidAuthenticationException()
         eventMapper.toBean(request).let {
             it.createdBy = requesterId
-            val createdBy = EventParticipant(userId = requesterId)
-            createdBy.event = it
-            it.participants.add(createdBy)
             val response = commonServiceClient.getTags(request.tags)
             it.tags.clear()
             it.tags.addAll(response.map { t -> t.name })
-            return eventRepository.save(it).let(eventMapper::toDto)
+            val event = eventRepository.save(it).let(eventMapper::toDto)
+            event.id?.let { eventId ->
+                val createdBy = EventParticipant(
+                    EventParticipantId(
+                        eventId = eventId,
+                        userId = requesterId
+                    )
+                )
+                createdBy.event = it
+                it.participants.add(createdBy)
+            }
+            return event
         }
     }
 

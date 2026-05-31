@@ -1,6 +1,7 @@
 package com.fancia.backend.event.core.service
 
 import com.fancia.backend.event.core.entity.EventParticipant
+import com.fancia.backend.event.core.entity.EventParticipantId
 import com.fancia.backend.event.core.entity.ReservationId
 import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
@@ -70,8 +71,11 @@ class ReservationService(
 
         when (request.status) {
             ReservationStatus.ACCEPTED -> {
-                if (event.participants.none { it.userId == userId }) {
-                    val newParticipant = EventParticipant(userId = userId).apply {
+                if (event.participants.none { it.id.userId == userId }) {
+                    val newParticipant = EventParticipant(EventParticipantId(
+                        eventId = eventId,
+                        userId = userId
+                    )).apply {
                         this.event = event
                     }
                     event.participants.add(newParticipant)
@@ -80,7 +84,7 @@ class ReservationService(
             }
 
             ReservationStatus.WITHDREW -> {
-                event.participants.removeIf { it.userId == userId }
+                event.participants.removeIf { it.id.userId == userId }
                 eventRepository.save(event)
             }
 
