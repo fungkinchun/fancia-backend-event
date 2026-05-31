@@ -50,7 +50,7 @@ class ReservationService(
     fun update(eventId: UUID, userId: UUID, request: @Valid UpdateReservationRequest, jwt: Jwt): ReservationResponse {
         val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        val isAdmin = eventParticipantRepository.existsByEventIdAndUserIdAndRole(
+        val isAdmin = eventParticipantRepository.existsByIdEventIdAndIdUserIdAndRole(
             eventId,
             requesterId,
             EventRole.HOST

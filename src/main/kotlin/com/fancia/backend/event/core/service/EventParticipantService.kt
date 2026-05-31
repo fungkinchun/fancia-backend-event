@@ -22,7 +22,7 @@ class EventParticipantService(
             throw EventNotFoundException(eventId)
         }
         val participants: Page<EventParticipant> =
-            eventParticipantRepository.findByEventId(eventId, pageable)
+            eventParticipantRepository.findByIdEventId(eventId, pageable)
 
         return participants.map(eventParticipantMapper::toDto)
     }

@@ -10,8 +10,8 @@ import java.util.*
 
 @Repository
 interface EventParticipantRepository : JpaRepository<EventParticipant, UUID> {
-    fun findByEventId(eventId: UUID, pageable: Pageable): Page<EventParticipant>
-    fun existsByEventIdAndUserIdAndRole(
+    fun findByIdEventId(eventId: UUID, pageable: Pageable): Page<EventParticipant>
+    fun existsByIdEventIdAndIdUserIdAndRole(
         eventId: UUID,
         userId: UUID,
         role: EventRole = EventRole.HOST
