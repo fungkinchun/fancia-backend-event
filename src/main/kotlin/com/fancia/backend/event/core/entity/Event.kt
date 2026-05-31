@@ -16,6 +16,10 @@ class Event : AbstractEntity() {
     var description: String = ""
     var startTime: LocalDateTime? = null
     var duration: Duration? = null
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable
+    @Column(name = "event_interest_groups")
     var interestGroups: MutableSet<UUID> = mutableSetOf()
 
     @OneToMany(mappedBy = "event", cascade = [CascadeType.ALL], orphanRemoval = true)
