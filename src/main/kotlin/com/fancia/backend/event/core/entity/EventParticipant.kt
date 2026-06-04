@@ -10,7 +10,6 @@ data class EventParticipantId(
     val eventId: UUID,
     val userId: UUID
 ) : Serializable {
-
     override fun equals(other: Any?): Boolean =
         other is EventParticipantId &&
                 other.eventId == eventId &&

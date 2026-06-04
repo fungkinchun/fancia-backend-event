@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import java.util.*
 
-@FeignClient(name = "user-service", url = "/api", configuration = [FeignConfig::class])
+@FeignClient(name = "user-service", path = "/api", configuration = [FeignConfig::class])
 interface UserServiceClient {
     @GetMapping("/users/{id}")
     fun getUserById(@PathVariable("id") id: UUID): UserResponse

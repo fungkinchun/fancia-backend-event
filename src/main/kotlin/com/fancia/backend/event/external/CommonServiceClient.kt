@@ -1,7 +1,7 @@
 package com.fancia.backend.event.external
 
 import com.fancia.backend.event.config.FeignConfig
-import com.fancia.backend.shared.common.core.dto.TagResponse
+import com.fancia.backend.shared.common.tag.core.dto.TagResponse
 import org.springframework.cloud.openfeign.FeignClient
 import org.springframework.data.domain.Page
 import org.springframework.web.bind.annotation.GetMapping

@@ -1,4 +1,5 @@
 server:
+  forward-headers-strategy: framework
   servlet:
     context-path: /${REPO_NAME}
 spring:
@@ -49,14 +50,24 @@ spring:
         config:
           auth-service:
             url: ${AUTH_SERVICE_URL:#{null}}
+          auth-internal-service:
+            url: ${AUTH_INTERNAL_SERVICE_URL:#{null}}
           common-service:
             url: ${COMMON_SERVICE_URL:#{null}}
+          common-internal-service:
+            url: ${COMMON_INTERNAL_SERVICE_URL:#{null}}
           user-service:
             url: ${USER_SERVICE_URL:#{null}}
+          user-internal-service:
+            url: ${USER_INTERNAL_SERVICE_URL:#{null}}
           interestgroup-service:
             url: ${INTERESTGROUP_SERVICE_URL:#{null}}
+          interestgroup-internal-service:
+            url: ${INTERESTGROUP_INTERNAL_SERVICE_URL:#{null}}
           event-service:
             url: ${EVENT_SERVICE_URL:#{null}}
+          event-internal-service:
+            url: ${EVENT_INTERNAL_SERVICE_URL:#{null}}
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.UUIDSerializer

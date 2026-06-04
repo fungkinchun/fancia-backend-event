@@ -1,7 +1,7 @@
 create table event_interest_groups (event_id uuid not null, event_interest_groups uuid);
 create table event_participants (event_id uuid not null, user_id uuid not null, role varchar(255) check ((role in ('HOST','COHOST','GUEST'))), primary key (event_id, user_id));
 create table event_tags (event_id uuid not null, tag varchar(100));
-create table events (deleted boolean not null, duration numeric(21,0), created_at timestamp(6), start_time timestamp(6), created_by uuid, id uuid not null, description varchar(255) not null, name varchar(255) not null, primary key (id));
+create table events (deleted boolean not null, created_at timestamp(6), end_time timestamp(6), start_time timestamp(6), created_by uuid, id uuid not null, description varchar(255) not null, name varchar(255) not null, primary key (id));
 comment on column events.deleted is 'Soft-delete indicator';
 create table reservations (guests integer not null, event_id uuid not null, user_id uuid not null, payload varchar(255), status varchar(255) check ((status in ('PENDING','ACCEPTED','WHITELIST','DENIED','WITHDREW'))), primary key (event_id, user_id));
 alter table if exists event_interest_groups add constraint FK9pyxt3n5c0gtivo6y3nxyw5fg foreign key (event_id) references events;

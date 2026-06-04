@@ -1,0 +1,42 @@
+package com.fancia.backend.event.core.service
+
+import com.fancia.backend.event.external.CommonInternalClient
+import com.fancia.backend.shared.common.comment.core.dto.CommentResponse
+import com.fancia.backend.shared.common.comment.core.dto.CreateCommentRequest
+import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.stereotype.Service
+import java.util.UUID
+
+@Service
+class EventPostCommentService(
+    private val eventPostService: EventPostService,
+    private val commonInternalClient: CommonInternalClient,
+) {
+    fun create(
+        eventId: UUID,
+        postId: UUID,
+        request: CreateCommentRequest,
+        jwt: Jwt,
+    ): CommentResponse {
+        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        eventPostService.get(eventId, postId, jwt)
+        return commonInternalClient.createComment(
+            CreateCommentRequest(
+                targetId = eventId,
+                authorUserId = requesterId,
+                body = request.body,
+                parentId = request.parentId,
+                postId = postId,
+            )
+        )
+    }
+
+    fun list(eventId: UUID, postId: UUID, pageable: Pageable, jwt: Jwt): Page<CommentResponse> {
+        eventPostService.get(eventId, postId, jwt)
+        return commonInternalClient.listComments(targetId = null, postId = postId, pageable = pageable)
+    }
+}

@@ -72,10 +72,12 @@ class ReservationService(
         when (request.status) {
             ReservationStatus.ACCEPTED -> {
                 if (event.participants.none { it.id.userId == userId }) {
-                    val newParticipant = EventParticipant(EventParticipantId(
-                        eventId = eventId,
-                        userId = userId
-                    )).apply {
+                    val newParticipant = EventParticipant(
+                        EventParticipantId(
+                            eventId = eventId,
+                            userId = userId
+                        )
+                    ).apply {
                         this.event = event
                     }
                     event.participants.add(newParticipant)

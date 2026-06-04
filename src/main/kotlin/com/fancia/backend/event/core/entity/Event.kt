@@ -2,7 +2,6 @@ package com.fancia.backend.event.core.entity
 
 import com.fancia.backend.shared.common.core.entity.AbstractEntity
 import jakarta.persistence.*
-import java.time.Duration
 import java.time.LocalDateTime
 import java.util.*
 
@@ -15,7 +14,7 @@ class Event : AbstractEntity() {
     @Column(nullable = false)
     var description: String = ""
     var startTime: LocalDateTime? = null
-    var duration: Duration? = null
+    var endTime: LocalDateTime? = null
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable
