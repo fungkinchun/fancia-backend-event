@@ -3,6 +3,7 @@ package com.fancia.backend.event.core.controller
 import com.fancia.backend.event.core.service.EventPostService
 import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
+import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -17,13 +18,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
+import org.springframework.web.bind.annotation.*
+import java.util.*
 
 @RestController
 @RequestMapping("/api/events/{eventId}/posts")
@@ -73,5 +69,37 @@ class EventPostController(
         @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<PostResponse> {
         return ResponseEntity.ok(eventPostService.get(eventId, postId, jwt))
+    }
+
+    @Operation(summary = "Update post")
+    @PutMapping("/{postId}")
+    fun updatePost(
+        @PathVariable eventId: UUID,
+        @PathVariable postId: UUID,
+        @RequestBody @Valid request: UpdatePostRequest,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<PostResponse> {
+        return ResponseEntity.ok(eventPostService.update(eventId, postId, request, jwt))
+    }
+
+    @Operation(summary = "Like post")
+    @PostMapping("/{postId}/likes")
+    fun likePost(
+        @PathVariable eventId: UUID,
+        @PathVariable postId: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<Void> {
+        eventPostService.like(eventId, postId, jwt)
+        return ResponseEntity.noContent().build()
+    }
+
+    @DeleteMapping("/{postId}/likes")
+    fun unlikePost(
+        @PathVariable eventId: UUID,
+        @PathVariable postId: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<Void> {
+        eventPostService.unlike(eventId, postId, jwt)
+        return ResponseEntity.noContent().build()
     }
 }

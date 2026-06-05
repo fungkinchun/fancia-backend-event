@@ -3,17 +3,18 @@ package com.fancia.backend.event.core.service
 import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.external.CommonInternalClient
-import com.fancia.backend.shared.common.post.core.exception.PostAccessDeniedException
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.CreatePostRequest
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
+import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
+import com.fancia.backend.shared.common.post.core.exception.PostAccessDeniedException
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
-import java.util.UUID
+import java.util.*
 
 @Service
 class EventPostService(
@@ -31,25 +32,51 @@ class EventPostService(
                 authorUserId = requesterId,
                 body = request.body,
                 media = request.media,
+                isFeatured = request.isFeatured,
+                isPinned = request.isPinned,
             )
         )
     }
 
-    fun list(eventId: UUID, pageable: Pageable, jwt: Jwt): Page<PostResponse> {
+    fun update(
+        eventId: UUID,
+        postId: UUID,
+        request: UpdatePostRequest,
+        jwt: Jwt,
+    ): PostResponse {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
         }
+        val post = commonInternalClient.updatePost(postId, request)
+        if (post.targetId != eventId) {
+            throw EventNotFoundException(eventId)
+        }
+        return post
+    }
+
+    fun like(eventId: UUID, postId: UUID, jwt: Jwt) {
+        get(eventId, postId, jwt)
+        commonInternalClient.likePost(postId)
+    }
+
+    fun unlike(eventId: UUID, postId: UUID, jwt: Jwt) {
+        get(eventId, postId, jwt)
+        commonInternalClient.unlikePost(postId)
+    }
+
+    fun list(eventId: UUID, pageable: Pageable, jwt: Jwt): Page<PostResponse> {
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        assertEventExists(eventId)
         return commonInternalClient.listPosts(eventId, pageable)
     }
 
     fun get(eventId: UUID, postId: UUID, jwt: Jwt): PostResponse {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        if (!eventRepository.existsById(eventId)) {
-            throw EventNotFoundException(eventId)
-        }
+        assertEventExists(eventId)
         val post = commonInternalClient.getPost(postId)
         if (post.targetId != eventId) {
             throw EventNotFoundException(eventId)
@@ -57,10 +84,14 @@ class EventPostService(
         return post
     }
 
-    private fun assertCanPost(eventId: UUID, requesterId: UUID) {
+    private fun assertEventExists(eventId: UUID) {
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
         }
+    }
+
+    private fun assertCanPost(eventId: UUID, requesterId: UUID) {
+        assertEventExists(eventId)
         if (!eventParticipantRepository.existsByIdEventIdAndIdUserId(eventId, requesterId)) {
             throw PostAccessDeniedException(eventId)
         }

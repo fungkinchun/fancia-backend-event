@@ -5,15 +5,12 @@ import com.fancia.backend.shared.common.comment.core.dto.CommentResponse
 import com.fancia.backend.shared.common.comment.core.dto.CreateCommentRequest
 import com.fancia.backend.shared.common.post.core.dto.CreatePostRequest
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
+import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
 import org.springframework.cloud.openfeign.FeignClient
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestParam
-import java.util.UUID
+import org.springframework.web.bind.annotation.*
+import java.util.*
 
 @FeignClient(
     name = "common-internal-service",
@@ -31,6 +28,9 @@ interface CommonInternalClient {
         pageable: Pageable,
     ): Page<CommentResponse>
 
+    @GetMapping("/comments/{commentId}")
+    fun getComment(@PathVariable commentId: UUID): CommentResponse
+
     @PostMapping("/posts")
     fun createPost(@RequestBody request: CreatePostRequest): PostResponse
 
@@ -42,4 +42,22 @@ interface CommonInternalClient {
 
     @GetMapping("/posts/{postId}")
     fun getPost(@PathVariable postId: UUID): PostResponse
+
+    @PutMapping("/posts/{postId}")
+    fun updatePost(
+        @PathVariable postId: UUID,
+        @RequestBody request: UpdatePostRequest,
+    ): PostResponse
+
+    @PostMapping("/posts/{postId}/likes")
+    fun likePost(@PathVariable postId: UUID)
+
+    @DeleteMapping("/posts/{postId}/likes")
+    fun unlikePost(@PathVariable postId: UUID)
+
+    @PostMapping("/comments/{commentId}/likes")
+    fun likeComment(@PathVariable commentId: UUID)
+
+    @DeleteMapping("/comments/{commentId}/likes")
+    fun unlikeComment(@PathVariable commentId: UUID)
 }

@@ -12,7 +12,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
-import java.util.UUID
+import java.util.*
 
 @Service
 class EventCommentService(
@@ -42,9 +42,34 @@ class EventCommentService(
     fun list(eventId: UUID, pageable: Pageable, jwt: Jwt): Page<CommentResponse> {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
+        assertEventExists(eventId)
+        return commonInternalClient.listComments(eventId, null, pageable)
+    }
+
+    fun get(eventId: UUID, commentId: UUID, jwt: Jwt): CommentResponse {
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        assertEventExists(eventId)
+        val comment = commonInternalClient.getComment(commentId)
+        if (comment.targetId != eventId) {
+            throw EventNotFoundException(eventId)
+        }
+        return comment
+    }
+
+    fun like(eventId: UUID, commentId: UUID, jwt: Jwt) {
+        get(eventId, commentId, jwt)
+        commonInternalClient.likeComment(commentId)
+    }
+
+    fun unlike(eventId: UUID, commentId: UUID, jwt: Jwt) {
+        get(eventId, commentId, jwt)
+        commonInternalClient.unlikeComment(commentId)
+    }
+
+    private fun assertEventExists(eventId: UUID) {
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
         }
-        return commonInternalClient.listComments(eventId, null,pageable)
     }
 }
