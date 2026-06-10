@@ -32,8 +32,8 @@ class EventPostService(
                 authorUserId = requesterId,
                 body = request.body,
                 media = request.media,
-                isFeatured = request.isFeatured,
-                isPinned = request.isPinned,
+                featured = request.featured,
+                pinned = request.pinned,
             )
         )
     }
