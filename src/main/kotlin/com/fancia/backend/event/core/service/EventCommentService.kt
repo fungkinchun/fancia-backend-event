@@ -43,7 +43,7 @@ class EventCommentService(
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         assertEventExists(eventId)
-        return commonInternalClient.listComments(eventId, null, pageable)
+        return commonInternalClient.listComments(eventId, pageable)
     }
 
     fun get(eventId: UUID, commentId: UUID, jwt: Jwt): CommentResponse {

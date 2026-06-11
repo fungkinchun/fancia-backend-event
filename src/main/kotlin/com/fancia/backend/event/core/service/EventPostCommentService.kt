@@ -27,24 +27,23 @@ class EventPostCommentService(
         eventPostService.get(eventId, postId, jwt)
         return commonInternalClient.createComment(
             CreateCommentRequest(
-                targetId = eventId,
+                targetId = postId,
                 authorUserId = requesterId,
                 body = request.body,
                 parentId = request.parentId,
-                postId = postId,
             )
         )
     }
 
     fun list(eventId: UUID, postId: UUID, pageable: Pageable, jwt: Jwt): Page<CommentResponse> {
         eventPostService.get(eventId, postId, jwt)
-        return commonInternalClient.listComments(targetId = null, postId = postId, pageable = pageable)
+        return commonInternalClient.listComments(postId, pageable)
     }
 
     fun get(eventId: UUID, postId: UUID, commentId: UUID, jwt: Jwt): CommentResponse {
         eventPostService.get(eventId, postId, jwt)
         val comment = commonInternalClient.getComment(commentId)
-        if (comment.targetId != eventId || comment.postId != postId) {
+        if (comment.targetId != postId) {
             throw EventNotFoundException(eventId)
         }
         return comment

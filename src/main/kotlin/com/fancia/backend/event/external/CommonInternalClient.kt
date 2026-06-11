@@ -23,8 +23,7 @@ interface CommonInternalClient {
 
     @GetMapping("/comments")
     fun listComments(
-        @RequestParam(required = false) targetId: UUID?,
-        @RequestParam(required = false) postId: UUID?,
+        @RequestParam targetId: UUID,
         pageable: Pageable,
     ): Page<CommentResponse>
 
