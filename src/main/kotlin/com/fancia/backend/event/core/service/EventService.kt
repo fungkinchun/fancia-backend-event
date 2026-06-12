@@ -65,21 +65,15 @@ class EventService(
         name: String?,
         description: String?,
         tags: String?,
+        interestGroupId: UUID?,
         pageable: Pageable
     ): Page<EventResponse> {
-        val groups = when {
-            name.isNullOrBlank() && description.isNullOrBlank() && tags.isNullOrBlank() ->
-                eventRepository.findAll(pageable)
-
-            else -> {
-                eventRepository.findAll(
-                    name?.trim() ?: "",
-                    description?.trim() ?: "",
-                    tags?.trim() ?: "",
-                    pageable
-                )
-            }
-        }
-        return groups.map(eventMapper::toDto)
+        return eventRepository.findAll(
+            name?.trim() ?: "",
+            description?.trim() ?: "",
+            tags?.trim() ?: "",
+            interestGroupId,
+            pageable
+        ).map(eventMapper::toDto)
     }
 }

@@ -15,11 +15,15 @@ interface EventRepository : JpaRepository<Event, UUID> {
         """
     SELECT e
     FROM Event e
-    WHERE trgm_word_similarity(:name, e.name) = true
-       OR trgm_word_similarity(:description, e.description) = true
-       OR trgm_word_similarity(:tags, 
-       (SELECT LISTAGG(t, ',') WITHIN GROUP (ORDER BY t) FROM e.tags t)
-       ) = true
+    WHERE (:interestGroupId IS NULL OR :interestGroupId MEMBER OF e.interestGroups)
+      AND (
+           (:name = '' AND :description = '' AND :tags = '')
+           OR trgm_word_similarity(:name, e.name) = true
+           OR trgm_word_similarity(:description, e.description) = true
+           OR trgm_word_similarity(:tags,
+              (SELECT LISTAGG(t, ',') WITHIN GROUP (ORDER BY t) FROM e.tags t)
+           ) = true
+      )
     GROUP BY e
 """
     )
@@ -27,6 +31,7 @@ interface EventRepository : JpaRepository<Event, UUID> {
         @Param("name") name: String,
         @Param("description") description: String,
         @Param("tags") tags: String,
+        @Param("interestGroupId") interestGroupId: UUID?,
         pageable: Pageable
     ): Page<Event>
 

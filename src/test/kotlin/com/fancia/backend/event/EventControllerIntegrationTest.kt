@@ -36,15 +36,17 @@ class EventControllerIntegrationTest(
     private val jsonMapper: JsonMapper,
     private val eventMapper: EventMapper
 ) : FunSpec({
+    val testInterestGroupId = UUID.randomUUID()
+
     beforeSpec {
         configureFor(
             wiremock.host,
             wiremock.getMappedPort(8080)
         )
     }
+
     test("should create a new event") {
         val testUserId = UUID.randomUUID()
-        val testInterestGroupId = UUID.randomUUID()
         val mockResponse = mapOf(
             "content" to listOf(
                 mapOf(
@@ -115,6 +117,57 @@ class EventControllerIntegrationTest(
     test("should not list events because of wrong tag") {
         mockMvc
             .get("/api/events?tags=bad&page=0&size=3") {
+                accept = APPLICATION_JSON
+            }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(0))
+            }
+    }
+
+    test("should list events filtered by interest group id") {
+        mockMvc
+            .get("/api/events?interestGroupId=$testInterestGroupId&page=0&size=3") {
+                accept = APPLICATION_JSON
+            }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(1))
+                jsonPath("$.content[0].name", `is`("testEvent"))
+            }
+    }
+
+    test("should not list events for non-matching interest group id") {
+        val otherInterestGroupId = UUID.randomUUID()
+        mockMvc
+            .get("/api/events?interestGroupId=$otherInterestGroupId&page=0&size=3") {
+                accept = APPLICATION_JSON
+            }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(0))
+            }
+    }
+
+    test("should list events filtered by interest group id and tags") {
+        mockMvc
+            .get("/api/events?interestGroupId=$testInterestGroupId&tags=good&page=0&size=3") {
+                accept = APPLICATION_JSON
+            }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(1))
+                jsonPath("$.content[0].name", `is`("testEvent"))
+            }
+    }
+
+    test("should not list events when interest group id and tags do not match") {
+        mockMvc
+            .get("/api/events?interestGroupId=$testInterestGroupId&tags=bad&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }

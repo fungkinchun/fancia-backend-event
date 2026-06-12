@@ -57,7 +57,7 @@ class EventController(
     @GetMapping
     @Operation(
         summary = "List events",
-        description = "Returns a paginated list of events. Supports fuzzy search by name, description and tags."
+        description = "Returns a paginated list of events. Supports fuzzy search by name, description and tags, and filtering by interest group."
     )
     @ApiResponses(
         value = [
@@ -73,10 +73,13 @@ class EventController(
         @RequestParam(required = false)
         @Parameter(description = "Fuzzy search term for tags, use comma to separate multiple tags")
         tags: String? = null,
+        @RequestParam(required = false)
+        @Parameter(description = "Filter events linked to this interest group")
+        interestGroupId: UUID? = null,
         @PageableDefault(size = 20)
         pageable: Pageable
     ): ResponseEntity<Page<EventResponse>> {
-        val groups = eventService.findAll(name, description, tags, pageable)
+        val groups = eventService.findAll(name, description, tags, interestGroupId, pageable)
         return ResponseEntity.ok(groups)
     }
 }

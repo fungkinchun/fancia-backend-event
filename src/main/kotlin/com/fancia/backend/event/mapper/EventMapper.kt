@@ -4,10 +4,7 @@ import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
-import org.mapstruct.Mapper
-import org.mapstruct.MappingTarget
-import org.mapstruct.NullValueMappingStrategy
-import org.mapstruct.ReportingPolicy
+import org.mapstruct.*
 
 @Mapper(
     componentModel = "spring",
@@ -19,6 +16,12 @@ import org.mapstruct.ReportingPolicy
 interface EventMapper {
     fun toDto(event: Event): EventResponse
     fun toBean(event: CreateEventRequest): Event
+
+    @AfterMapping
+    fun mapInterestGroup(request: CreateEventRequest, @MappingTarget event: Event) {
+        request.interestGroupId?.let { event.interestGroups.add(it) }
+    }
+
     fun toBean(event: UpdateEventRequest): Event
     fun toBean(response: EventResponse): Event
     fun toBean(request: UpdateEventRequest, @MappingTarget target: Event): Event
