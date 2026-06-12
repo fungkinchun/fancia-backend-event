@@ -72,7 +72,7 @@ class EventPostControllerIntegrationTest(
                         "description" to "Event for post integration tests",
                         "startTime" to "2024-06-01T10:00:00",
                         "duration" to "PT2H",
-                        "interestGroupId" to null,
+                        "interestGroups" to emptyList<Any>(),
                         "tags" to emptyList<Any>(),
                     )
                 )

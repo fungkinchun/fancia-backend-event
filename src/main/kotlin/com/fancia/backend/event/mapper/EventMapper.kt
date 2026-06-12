@@ -16,13 +16,17 @@ import org.mapstruct.*
 interface EventMapper {
     fun toDto(event: Event): EventResponse
     fun toBean(event: CreateEventRequest): Event
-
-    @AfterMapping
-    fun mapInterestGroup(request: CreateEventRequest, @MappingTarget event: Event) {
-        request.interestGroupId?.let { event.interestGroups.add(it) }
-    }
-
     fun toBean(event: UpdateEventRequest): Event
     fun toBean(response: EventResponse): Event
     fun toBean(request: UpdateEventRequest, @MappingTarget target: Event): Event
+
+    @AfterMapping
+    fun initializeCollections(@MappingTarget event: Event) {
+        if (event.interestGroups == null) {
+            event.interestGroups = mutableSetOf()
+        }
+        if (event.tags == null) {
+            event.tags = mutableSetOf()
+        }
+    }
 }

@@ -30,6 +30,6 @@ class Event : AbstractEntity() {
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable
     @Column(name = "tag", length = 100)
-    val tags: MutableSet<String> = mutableSetOf()
+    var tags: MutableSet<String> = mutableSetOf()
 }
  

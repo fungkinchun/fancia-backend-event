@@ -82,7 +82,7 @@ class EventControllerIntegrationTest(
                     "description" to "string",
                     "startTime" to "2024-06-01T10:00:00",
                     "duration" to "PT2H",
-                    "interestGroupId" to testInterestGroupId,
+                    "interestGroups" to listOf(testInterestGroupId),
                     "tags" to listOf("good")
                 )
                 content = jsonMapper.writeValueAsString(requestBody)
