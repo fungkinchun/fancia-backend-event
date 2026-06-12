@@ -8,7 +8,6 @@ import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.CreatePostRequest
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
 import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
-import com.fancia.backend.shared.common.post.core.exception.PostAccessDeniedException
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -25,7 +24,9 @@ class EventPostService(
     fun create(eventId: UUID, request: CreatePostBody, jwt: Jwt): PostResponse {
         val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        assertCanPost(eventId, requesterId)
+        if (!eventRepository.existsById(eventId)) {
+            throw EventNotFoundException(eventId)
+        }
         return commonInternalClient.createPost(
             CreatePostRequest(
                 targetId = eventId,
@@ -67,33 +68,20 @@ class EventPostService(
     }
 
     fun list(eventId: UUID, pageable: Pageable, jwt: Jwt): Page<PostResponse> {
-        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
-            ?: throw InvalidAuthenticationException()
-        assertEventExists(eventId)
+        if (!eventRepository.existsById(eventId)) {
+            throw EventNotFoundException(eventId)
+        }
         return commonInternalClient.listPosts(eventId, pageable)
     }
 
     fun get(eventId: UUID, postId: UUID, jwt: Jwt): PostResponse {
-        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
-            ?: throw InvalidAuthenticationException()
-        assertEventExists(eventId)
+        if (!eventRepository.existsById(eventId)) {
+            throw EventNotFoundException(eventId)
+        }
         val post = commonInternalClient.getPost(postId)
         if (post.targetId != eventId) {
             throw EventNotFoundException(eventId)
         }
         return post
-    }
-
-    private fun assertEventExists(eventId: UUID) {
-        if (!eventRepository.existsById(eventId)) {
-            throw EventNotFoundException(eventId)
-        }
-    }
-
-    private fun assertCanPost(eventId: UUID, requesterId: UUID) {
-        assertEventExists(eventId)
-        if (!eventParticipantRepository.existsByIdEventIdAndIdUserId(eventId, requesterId)) {
-            throw PostAccessDeniedException(eventId)
-        }
     }
 }

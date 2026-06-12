@@ -28,7 +28,7 @@ alter table if exists user_privileges add constraint FKobuc3eaoytxqaj534be5b7xqs
 alter table if exists verification_codes add constraint FK2c664upaiv1f6h7e5ueyy1ae3 foreign key ("user_id") references "users";
 
 create table comment_likes (liked_at timestamp(6), comment_id uuid not null, user_id uuid not null, primary key (comment_id, user_id));
-create table comments (deleted boolean not null, created_at timestamp(6), author_user_id uuid not null, created_by uuid, id uuid not null, parent_id uuid, target_id uuid not null, body varchar(4000) not null, primary key (id));
+create table comments (deleted boolean not null, created_at timestamp(6), author_user_id uuid not null, created_by uuid, id uuid not null, resource_id uuid, target_id uuid not null, body varchar(4000) not null, primary key (id));
 comment on column comments.deleted is 'Soft-delete indicator';
 create table post_likes (liked_at timestamp(6), post_id uuid not null, user_id uuid not null, primary key (post_id, user_id));
 create table post_media (deleted boolean not null, sort_order integer not null, created_at timestamp(6), created_by uuid, id uuid not null, media_type varchar(16) not null check ((media_type in ('IMAGE','VIDEO'))), post_id uuid not null, object_key varchar(1024) not null, primary key (id));
@@ -38,7 +38,6 @@ comment on column posts.deleted is 'Soft-delete indicator';
 create table tags (deleted boolean not null, created_at timestamp(6), created_by uuid, id uuid not null, name varchar(255) not null unique, primary key (id));
 comment on column tags.deleted is 'Soft-delete indicator';
 alter table if exists comment_likes add constraint FK3wa5u7bs1p1o9hmavtgdgk1go foreign key (comment_id) references comments;
-alter table if exists comments add constraint FKlri30okf66phtcgbe5pok7cc0 foreign key (parent_id) references comments;
 alter table if exists post_likes add constraint FKa5wxsgl4doibhbed9gm7ikie2 foreign key (post_id) references posts;
 alter table if exists post_media add constraint FK1urcum9dtf0vgul7k405f4r2d foreign key (post_id) references posts;
 

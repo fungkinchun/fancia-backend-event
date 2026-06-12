@@ -53,8 +53,8 @@ class EventCommentController(
     }
 
     @Operation(
-        summary = "List comments on event",
-        description = "Paginated top-level comments for the event, newest first.",
+        summary = "List comments",
+        description = "Paginated comments scoped by resourceId (event id or post id). Omit targetId to list top-level comments for that resource, or pass a comment id for replies.",
     )
     @ApiResponses(
         value = [
@@ -68,11 +68,14 @@ class EventCommentController(
         @PathVariable
         @Parameter(description = "Event id")
         eventId: UUID,
+        @RequestParam(required = false)
+        @Parameter(description = "Target id to list under (defaults to resourceId)")
+        targetId: UUID?,
         @PageableDefault(size = 20)
         pageable: Pageable,
         @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<Page<CommentResponse>> {
-        return ResponseEntity.ok(eventCommentService.list(eventId, pageable, jwt))
+        return ResponseEntity.ok(eventCommentService.list(eventId, targetId ?: eventId, pageable, jwt))
     }
 
     @Operation(summary = "Like comment")
