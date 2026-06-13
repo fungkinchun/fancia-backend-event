@@ -1,6 +1,7 @@
 package com.fancia.backend.event.core.entity
 
 import com.fancia.backend.shared.common.core.entity.AbstractEntity
+import com.fancia.backend.shared.event.core.enums.EventVisibility
 import jakarta.persistence.*
 import java.time.LocalDateTime
 import java.util.*
@@ -13,6 +14,10 @@ class Event : AbstractEntity() {
 
     @Column(nullable = false)
     var description: String = ""
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var visibility: EventVisibility = EventVisibility.PUBLIC
     var startTime: LocalDateTime? = null
     var endTime: LocalDateTime? = null
 

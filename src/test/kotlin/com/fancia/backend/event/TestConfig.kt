@@ -1,12 +1,16 @@
 package com.fancia.backend.event
 
+import org.mockito.Mockito.mock
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
+import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.DynamicPropertyRegistrar
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.kafka.KafkaContainer
 import org.wiremock.integrations.testcontainers.WireMockContainer
+import software.amazon.awssdk.services.s3.S3Client
 
 @TestConfiguration(proxyBeanMethods = false)
 class TestConfig {
@@ -44,4 +48,30 @@ class TestConfig {
             }
         }
     }
+
+    @Bean
+    fun jwtDecoder(): JwtDecoder = mock()
+
+    @Bean
+    @Primary
+    fun s3Client(): S3Client = mock(S3Client::class.java)
+
+    @Bean
+    fun testProperties(): DynamicPropertyRegistrar =
+        DynamicPropertyRegistrar { registry ->
+            registry.add("spring.jpa.hibernate.ddl-auto") { "none" }
+            registry.add("spring.flyway.enabled") { "true" }
+            registry.add("spring.cloud.aws.secretsmanager.enabled") { "false" }
+            registry.add("spring.cloud.aws.region.static") { "us-east-1" }
+            registry.add("spring.kafka.listener.auto-startup") { "false" }
+            registry.add("spring.kafka.admin.auto-create") { "false" }
+            registry.add("spring.autoconfigure.exclude") {
+                listOf(
+                    "io.awspring.cloud.autoconfigure.core.AwsAutoConfiguration",
+                    "io.awspring.cloud.autoconfigure.core.CredentialsProviderAutoConfiguration",
+                    "io.awspring.cloud.autoconfigure.s3.S3AutoConfiguration",
+                    "io.awspring.cloud.autoconfigure.secretsmanager.AwsSecretsManagerAutoConfiguration",
+                ).joinToString(",")
+            }
+        }
 }

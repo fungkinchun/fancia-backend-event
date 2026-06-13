@@ -32,7 +32,6 @@ class EventCommentService(
         eventId: UUID,
         targetId: UUID,
         pageable: Pageable,
-        jwt: Jwt,
     ): Page<CommentResponse> {
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
@@ -40,9 +39,7 @@ class EventCommentService(
         return commonInternalClient.listComments(targetId, eventId, pageable)
     }
 
-    fun get(eventId: UUID, commentId: UUID, jwt: Jwt): CommentResponse {
-        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
-            ?: throw InvalidAuthenticationException()
+    fun get(eventId: UUID, commentId: UUID): CommentResponse {
         val comment = commonInternalClient.getComment(commentId)
         if (comment.resourceId != eventId) {
             throw CommentNotFoundException(commentId)
@@ -51,12 +48,16 @@ class EventCommentService(
     }
 
     fun like(eventId: UUID, commentId: UUID, jwt: Jwt) {
-        get(eventId, commentId, jwt)
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        get(eventId, commentId)
         commonInternalClient.likeComment(commentId)
     }
 
     fun unlike(eventId: UUID, commentId: UUID, jwt: Jwt) {
-        get(eventId, commentId, jwt)
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        get(eventId, commentId)
         commonInternalClient.unlikeComment(commentId)
     }
 }

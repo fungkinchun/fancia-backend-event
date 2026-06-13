@@ -54,10 +54,25 @@ class EventController(
         return ResponseEntity.ok(eventService.update(id, request, jwt))
     }
 
+    @GetMapping("/{id}")
+    @Operation(
+        summary = "Get event by id",
+        description = "Returns an event by id. Private and group events are accessible via direct link."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Event returned"),
+            ApiResponse(responseCode = "404", description = "Event not found"),
+        ]
+    )
+    fun getEvent(@PathVariable id: UUID): ResponseEntity<EventResponse> {
+        return ResponseEntity.ok(eventService.findById(id))
+    }
+
     @GetMapping
     @Operation(
         summary = "List events",
-        description = "Returns a paginated list of events. Supports fuzzy search by name, description and tags, and filtering by interest group."
+        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link."
     )
     @ApiResponses(
         value = [
@@ -73,13 +88,13 @@ class EventController(
         @RequestParam(required = false)
         @Parameter(description = "Fuzzy search term for tags, use comma to separate multiple tags")
         tags: String? = null,
-        @RequestParam(required = false)
+        @RequestParam(required = false, name = "interestGroup")
         @Parameter(description = "Filter events linked to this interest group")
-        interestGroupId: UUID? = null,
+        interestGroup: UUID? = null,
         @PageableDefault(size = 20)
         pageable: Pageable
     ): ResponseEntity<Page<EventResponse>> {
-        val groups = eventService.findAll(name, description, tags, interestGroupId, pageable)
+        val groups = eventService.findAll(name, description, tags, interestGroup, pageable)
         return ResponseEntity.ok(groups)
     }
 }

@@ -30,34 +30,34 @@ class ReservationService(
 ) {
     @Transactional
     fun create(eventId: UUID, request: @Valid CreateReservationRequest, jwt: Jwt): ReservationResponse {
-        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+        val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         val event = eventRepository.findByIdOrNull(eventId)
             ?: throw EventNotFoundException(eventId)
-        if (reservationRepository.existsByIdEventIdAndIdUserId(eventId, requesterId)) {
-            throw ReservationAlreadyExistsException(eventId, requesterId)
+        if (reservationRepository.existsByIdEventIdAndIdUserId(eventId, currentUserId)) {
+            throw ReservationAlreadyExistsException(eventId, currentUserId)
         }
         val reservation = reservationMapper.toBean(request)
         reservation.event = event
         reservation.id = ReservationId(
             eventId = event.id!!,
-            requesterId
+            currentUserId
         )
         return reservationRepository.save(reservation).let(reservationMapper::toDto)
     }
 
     @Transactional
     fun update(eventId: UUID, userId: UUID, request: @Valid UpdateReservationRequest, jwt: Jwt): ReservationResponse {
-        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+        val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         val isAdmin = eventParticipantRepository.existsByIdEventIdAndIdUserIdAndRole(
             eventId,
-            requesterId,
+            currentUserId,
             EventRole.HOST
         )
 
         when {
-            !isAdmin && requesterId != userId ->
+            !isAdmin && currentUserId != userId ->
                 throw ReservationChangeDeniedException(eventId = eventId, userId)
 
             !isAdmin && request.status != ReservationStatus.WITHDREW ->

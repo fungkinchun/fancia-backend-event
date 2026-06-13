@@ -10,7 +10,9 @@ import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationExce
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
+import com.fancia.backend.shared.event.core.enums.EventVisibility
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
+import com.fancia.backend.shared.event.core.exception.GroupEventRequiresInterestGroupsException
 import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -29,12 +31,21 @@ class EventService(
         return eventRepository.findByIdAndCreatedBy(id, createdBy)
     }
 
+    fun findById(id: UUID): EventResponse {
+        return eventRepository.findById(id)
+            .map(eventMapper::toDto)
+            .orElseThrow { EventNotFoundException(id) }
+    }
+
     @Transactional
     fun create(request: @Valid CreateEventRequest, jwt: Jwt): EventResponse {
-        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+        val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
+        val visibility = request.visibility ?: EventVisibility.PUBLIC
+        validateVisibility(visibility, request.interestGroups)
         eventMapper.toBean(request).let {
-            it.createdBy = requesterId
+            it.createdBy = currentUserId
+            it.visibility = visibility
             val response = commonServiceClient.getTags(request.tags)
             it.tags.clear()
             it.tags.addAll(response.map { t -> t.name })
@@ -43,7 +54,7 @@ class EventService(
                 val createdBy = EventParticipant(
                     EventParticipantId(
                         eventId = eventId,
-                        userId = requesterId
+                        userId = currentUserId
                     )
                 )
                 createdBy.event = it
@@ -55,10 +66,16 @@ class EventService(
 
     @Transactional
     fun update(id: UUID, request: @Valid UpdateEventRequest, jwt: Jwt): EventResponse {
-        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+        val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        val event = findByIdAndCreatedBy(id, requesterId) ?: throw EventNotFoundException(id)
-        return eventRepository.save(eventMapper.toBean(request, event)).let(eventMapper::toDto)
+        val event = findByIdAndCreatedBy(id, currentUserId) ?: throw EventNotFoundException(id)
+        val visibility = request.visibility ?: event.visibility
+        validateVisibility(visibility, event.interestGroups)
+        return eventRepository.save(
+            eventMapper.toBean(request, event).apply {
+                this.visibility = visibility
+            }
+        ).let(eventMapper::toDto)
     }
 
     fun findAll(
@@ -75,5 +92,11 @@ class EventService(
             interestGroupId,
             pageable
         ).map(eventMapper::toDto)
+    }
+
+    private fun validateVisibility(visibility: EventVisibility, interestGroups: Set<UUID>) {
+        if (visibility == EventVisibility.GROUP && interestGroups.isEmpty()) {
+            throw GroupEventRequiresInterestGroupsException()
+        }
     }
 }

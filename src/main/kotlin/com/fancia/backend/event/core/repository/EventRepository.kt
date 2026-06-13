@@ -17,6 +17,14 @@ interface EventRepository : JpaRepository<Event, UUID> {
     FROM Event e
     WHERE (:interestGroupId IS NULL OR :interestGroupId MEMBER OF e.interestGroups)
       AND (
+           e.visibility = com.fancia.backend.shared.event.core.enums.EventVisibility.PUBLIC
+           OR (
+               e.visibility = com.fancia.backend.shared.event.core.enums.EventVisibility.GROUP
+               AND :interestGroupId IS NOT NULL
+               AND :interestGroupId MEMBER OF e.interestGroups
+           )
+      )
+      AND (
            (:name = '' AND :description = '' AND :tags = '')
            OR trgm_word_similarity(:name, e.name) = true
            OR trgm_word_similarity(:description, e.description) = true

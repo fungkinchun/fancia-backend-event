@@ -83,7 +83,8 @@ class EventControllerIntegrationTest(
                     "startTime" to "2024-06-01T10:00:00",
                     "duration" to "PT2H",
                     "interestGroups" to listOf(testInterestGroupId),
-                    "tags" to listOf("good")
+                    "tags" to listOf("good"),
+                    "visibility" to "PUBLIC",
                 )
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
@@ -111,6 +112,7 @@ class EventControllerIntegrationTest(
                 jsonPath("$.totalElements", `is`(1))
                 jsonPath("$.content[0].name", `is`("testEvent"))
                 jsonPath("$.content[0].tags[0]", `is`("good"))
+                jsonPath("$.content[0].visibility", `is`("PUBLIC"))
             }
     }
 
@@ -126,9 +128,90 @@ class EventControllerIntegrationTest(
             }
     }
 
+    test("should get event by id") {
+        val eventId = eventRepository.findAll().first { it.name == "testEvent" }.id!!
+        mockMvc
+            .get("/api/events/$eventId") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.id", `is`(eventId.toString()))
+                jsonPath("$.name", `is`("testEvent"))
+            }
+    }
+
+    test("should not list private events but allow direct access by id") {
+        val testUserId = UUID.randomUUID()
+        stubFor(
+            get(urlPathEqualTo("/api/tags"))
+                .withQueryParam("search", equalTo("secret"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            jsonMapper.writeValueAsString(
+                                mapOf(
+                                    "content" to listOf(mapOf("name" to "secret")),
+                                    "totalElements" to 1,
+                                    "totalPages" to 1,
+                                    "size" to 20,
+                                    "number" to 0,
+                                )
+                            )
+                        )
+                )
+        )
+        val createResponse = mockMvc
+            .post("/api/events") {
+                with(jwt().jwt { it.claim("userId", testUserId) })
+                content = jsonMapper.writeValueAsString(
+                    mapOf(
+                        "name" to "Secret Event",
+                        "description" to "Invite only",
+                        "startTime" to "2024-06-02T10:00:00",
+                        "duration" to "PT1H",
+                        "interestGroups" to listOf(testInterestGroupId),
+                        "tags" to listOf("secret"),
+                        "visibility" to "PRIVATE",
+                    )
+                )
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.visibility", `is`("PRIVATE"))
+            }
+            .andReturn()
+            .response
+            .contentAsString
+        val createdPrivateEventId = jsonMapper.readTree(createResponse).get("id").asText()
+
+        mockMvc
+            .get("/api/events?tags=secret&page=0&size=10") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(0))
+            }
+
+        mockMvc
+            .get("/api/events/$createdPrivateEventId") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name", `is`("Secret Event"))
+                jsonPath("$.visibility", `is`("PRIVATE"))
+            }
+    }
+
     test("should list events filtered by interest group id") {
         mockMvc
-            .get("/api/events?interestGroupId=$testInterestGroupId&page=0&size=3") {
+            .get("/api/events?interestGroup=$testInterestGroupId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -142,7 +225,7 @@ class EventControllerIntegrationTest(
     test("should not list events for non-matching interest group id") {
         val otherInterestGroupId = UUID.randomUUID()
         mockMvc
-            .get("/api/events?interestGroupId=$otherInterestGroupId&page=0&size=3") {
+            .get("/api/events?interestGroup=$otherInterestGroupId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -154,7 +237,7 @@ class EventControllerIntegrationTest(
 
     test("should list events filtered by interest group id and tags") {
         mockMvc
-            .get("/api/events?interestGroupId=$testInterestGroupId&tags=good&page=0&size=3") {
+            .get("/api/events?interestGroup=$testInterestGroupId&tags=good&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -167,7 +250,7 @@ class EventControllerIntegrationTest(
 
     test("should not list events when interest group id and tags do not match") {
         mockMvc
-            .get("/api/events?interestGroupId=$testInterestGroupId&tags=bad&page=0&size=3") {
+            .get("/api/events?interestGroup=$testInterestGroupId&tags=bad&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }

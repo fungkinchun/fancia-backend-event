@@ -38,12 +38,15 @@ class EventCommentControllerIntegrationTest(
     }
 
     beforeEach {
-        resetAllRequests()
+        reset()
     }
 
     fun createEventViaApi(userId: UUID): UUID {
+        val testInterestGroupId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val tag = "test"
         stubFor(
             get(urlPathEqualTo("/api/tags"))
+                .withQueryParam("search", equalTo(tag))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -51,9 +54,9 @@ class EventCommentControllerIntegrationTest(
                         .withBody(
                             jsonMapper.writeValueAsString(
                                 mapOf(
-                                    "content" to emptyList<Any>(),
-                                    "totalElements" to 0,
-                                    "totalPages" to 0,
+                                    "content" to listOf(mapOf("name" to tag)),
+                                    "totalElements" to 1,
+                                    "totalPages" to 1,
                                     "size" to 20,
                                     "number" to 0,
                                 )
@@ -70,8 +73,9 @@ class EventCommentControllerIntegrationTest(
                         "description" to "Event for comment integration tests",
                         "startTime" to "2024-06-01T10:00:00",
                         "duration" to "PT2H",
-                        "interestGroups" to emptyList<Any>(),
-                        "tags" to emptyList<Any>(),
+                        "interestGroups" to listOf(testInterestGroupId),
+                        "tags" to listOf(tag),
+                        "visibility" to "PUBLIC",
                     )
                 )
                 contentType = APPLICATION_JSON
@@ -234,7 +238,6 @@ class EventCommentControllerIntegrationTest(
 
         mockMvc
             .get("/api/events/$eventId/comments") {
-                with(jwt().jwt { it.claim("userId", userId) })
                 accept = APPLICATION_JSON
             }
             .andExpect { status { isOk() } }
@@ -271,7 +274,6 @@ class EventCommentControllerIntegrationTest(
 
         mockMvc
             .get("/api/events/$eventId/comments") {
-                with(jwt().jwt { it.claim("userId", userId) })
                 param("targetId", postId.toString())
                 accept = APPLICATION_JSON
             }
@@ -309,7 +311,6 @@ class EventCommentControllerIntegrationTest(
 
         mockMvc
             .get("/api/events/$eventId/comments") {
-                with(jwt().jwt { it.claim("userId", userId) })
                 param("targetId", parentCommentId.toString())
                 accept = APPLICATION_JSON
             }

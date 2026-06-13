@@ -18,7 +18,7 @@ class SecurityConfiguration {
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http.authorizeHttpRequests { customizer ->
-            customizer.requestMatchers(HttpMethod.GET, "/api/events").permitAll()
+            customizer.requestMatchers(HttpMethod.GET, "/api/**").permitAll()
             customizer.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             customizer.requestMatchers("/actuator/**").permitAll()
             customizer.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

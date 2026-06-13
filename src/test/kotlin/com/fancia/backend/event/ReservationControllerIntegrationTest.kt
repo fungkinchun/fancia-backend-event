@@ -7,6 +7,12 @@ import com.fancia.backend.event.mapper.EventMapper
 import com.fancia.backend.event.mapper.ReservationMapper
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.ReservationResponse
+import com.github.tomakehurst.wiremock.client.WireMock.aResponse
+import com.github.tomakehurst.wiremock.client.WireMock.configureFor
+import com.github.tomakehurst.wiremock.client.WireMock.equalTo
+import com.github.tomakehurst.wiremock.client.WireMock.get
+import com.github.tomakehurst.wiremock.client.WireMock.stubFor
+import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import org.hamcrest.CoreMatchers.`is`
@@ -18,6 +24,7 @@ import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.*
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.wiremock.integrations.testcontainers.WireMockContainer
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.json.JsonMapper
 import java.util.*
@@ -31,10 +38,38 @@ class ReservationControllerIntegrationTest(
     private val reservationRepository: ReservationRepository,
     private val jsonMapper: JsonMapper,
     private val eventMapper: EventMapper,
+    private val wiremock: WireMockContainer,
 ) : FunSpec({
+    beforeSpec {
+        configureFor(
+            wiremock.host,
+            wiremock.getMappedPort(8080),
+        )
+    }
+
     test("should create a new event") {
         val testUserId = UUID.randomUUID()
         val testInterestGroupId = UUID.randomUUID()
+        stubFor(
+            get(urlPathEqualTo("/api/tags"))
+                .withQueryParam("search", equalTo("good"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            jsonMapper.writeValueAsString(
+                                mapOf(
+                                    "content" to listOf(mapOf("name" to "good")),
+                                    "totalElements" to 1,
+                                    "totalPages" to 1,
+                                    "size" to 20,
+                                    "number" to 0,
+                                )
+                            )
+                        )
+                )
+        )
         val response = mockMvc
             .post("/api/events") {
                 with(jwt().jwt {
@@ -46,7 +81,8 @@ class ReservationControllerIntegrationTest(
                     "startTime" to "2024-06-01T10:00:00",
                     "duration" to "PT2H",
                     "interestGroups" to listOf(testInterestGroupId),
-                    "tags" to listOf("good")
+                    "tags" to listOf("good"),
+                    "visibility" to "PUBLIC",
                 )
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON

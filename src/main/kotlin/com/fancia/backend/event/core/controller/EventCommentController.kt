@@ -73,9 +73,8 @@ class EventCommentController(
         targetId: UUID?,
         @PageableDefault(size = 20)
         pageable: Pageable,
-        @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<Page<CommentResponse>> {
-        return ResponseEntity.ok(eventCommentService.list(eventId, targetId ?: eventId, pageable, jwt))
+        return ResponseEntity.ok(eventCommentService.list(eventId, targetId ?: eventId, pageable))
     }
 
     @Operation(summary = "Like comment")

@@ -22,7 +22,7 @@ class EventPostService(
     private val commonInternalClient: CommonInternalClient,
 ) {
     fun create(eventId: UUID, request: CreatePostBody, jwt: Jwt): PostResponse {
-        val requesterId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+        val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
@@ -30,7 +30,7 @@ class EventPostService(
         return commonInternalClient.createPost(
             CreatePostRequest(
                 targetId = eventId,
-                authorUserId = requesterId,
+                authorUserId = currentUserId,
                 body = request.body,
                 media = request.media,
                 featured = request.featured,
@@ -58,23 +58,27 @@ class EventPostService(
     }
 
     fun like(eventId: UUID, postId: UUID, jwt: Jwt) {
-        get(eventId, postId, jwt)
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        get(eventId, postId)
         commonInternalClient.likePost(postId)
     }
 
     fun unlike(eventId: UUID, postId: UUID, jwt: Jwt) {
-        get(eventId, postId, jwt)
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        get(eventId, postId)
         commonInternalClient.unlikePost(postId)
     }
 
-    fun list(eventId: UUID, pageable: Pageable, jwt: Jwt): Page<PostResponse> {
+    fun list(eventId: UUID, pageable: Pageable): Page<PostResponse> {
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
         }
         return commonInternalClient.listPosts(eventId, pageable)
     }
 
-    fun get(eventId: UUID, postId: UUID, jwt: Jwt): PostResponse {
+    fun get(eventId: UUID, postId: UUID): PostResponse {
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
         }
