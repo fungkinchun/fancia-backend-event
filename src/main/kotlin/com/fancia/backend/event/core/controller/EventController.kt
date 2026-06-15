@@ -38,7 +38,7 @@ class EventController(
     )
     @PostMapping
     fun createEvent(
-        @RequestBody request: CreateEventRequest,
+        @RequestBody @Valid request: CreateEventRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ResponseEntity<EventResponse> {
         val event = eventService.create(request, jwt)
@@ -72,7 +72,7 @@ class EventController(
     @GetMapping
     @Operation(
         summary = "List events",
-        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link."
+        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link. Supports proximity search when lat/lng are provided."
     )
     @ApiResponses(
         value = [
@@ -91,10 +91,19 @@ class EventController(
         @RequestParam(required = false, name = "interestGroup")
         @Parameter(description = "Filter events linked to this interest group")
         interestGroup: UUID? = null,
+        @RequestParam(required = false)
+        @Parameter(description = "Latitude for proximity search")
+        lat: Double?,
+        @RequestParam(required = false)
+        @Parameter(description = "Longitude for proximity search")
+        lng: Double?,
+        @RequestParam(required = false)
+        @Parameter(description = "Search radius in kilometres (required with lat/lng for proximity search)")
+        radiusKm: Double? = null,
         @PageableDefault(size = 20)
         pageable: Pageable
     ): ResponseEntity<Page<EventResponse>> {
-        val groups = eventService.findAll(name, description, tags, interestGroup, pageable)
+        val groups = eventService.findAll(name, description, tags, interestGroup, lat, lng, radiusKm, pageable)
         return ResponseEntity.ok(groups)
     }
 }

@@ -29,6 +29,8 @@ class Reservation(
     @JoinColumn(name = "event_id", insertable = false, updatable = false)
     var event: Event? = null
     var guests: Int = 0
+
+    @Column(length = 4000)
     var payload: String = ""
 
     @Enumerated(EnumType.STRING)

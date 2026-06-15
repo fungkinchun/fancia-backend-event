@@ -11,7 +11,7 @@ create table user_connected_accounts (deleted boolean not null, connected_at tim
 comment on column user_connected_accounts.deleted is 'Soft-delete indicator';
 create table uploaded_file (deleted boolean not null, created_at timestamp(6), size bigint, uploaded_at timestamp(6), created_by uuid, id uuid not null, "user_id" uuid, extension varchar(255), original_file_name varchar(255), url varchar(255), primary key (id));
 comment on column uploaded_file.deleted is 'Soft-delete indicator';
-create table user_links (user_id uuid not null, type varchar(50) not null check ((type in ('WEBSITE','INSTAGRAM','FACEBOOK','TWITTER','LINKEDIN','YOUTUBE','TIKTOK'))), url varchar(2048) not null, primary key (user_id, type, url));
+create table user_links (user_id uuid not null, type varchar(50) not null check ((type in ('WEBSITE','INSTAGRAM','FACEBOOK','TWITTER','LINKEDIN','YOUTUBE','TIKTOK'))), url varchar(255) not null, primary key (user_id, type, url));
 create table user_privileges (privilege_id uuid not null, user_id uuid not null, primary key (privilege_id, user_id));
 create table "users" (deleted boolean not null, verified boolean, created_at timestamp(6), created_by uuid, id uuid not null, email varchar(255), first_name varchar(255), last_name varchar(255), password varchar(255), profile_image_url varchar(255), role varchar(255) check ((role in ('USER','ADMIN'))), primary key (id));
 comment on column "users".deleted is 'Soft-delete indicator';
@@ -41,22 +41,41 @@ alter table if exists comment_likes add constraint FK3wa5u7bs1p1o9hmavtgdgk1go f
 alter table if exists post_likes add constraint FKa5wxsgl4doibhbed9gm7ikie2 foreign key (post_id) references posts;
 alter table if exists post_media add constraint FK1urcum9dtf0vgul7k405f4r2d foreign key (post_id) references posts;
 
-create table interest_groups (deleted boolean not null, created_at timestamp(6), created_by uuid, id uuid not null, description varchar(255) not null, name varchar(255) not null, primary key (id));
+create table interest_groups (deleted boolean not null, created_at timestamp(6), created_by uuid, id uuid not null, description varchar(4000) not null, name varchar(255) not null, primary key (id));
 comment on column interest_groups.deleted is 'Soft-delete indicator';
-create table interest_group_links (interest_group_id uuid not null, type varchar(50) not null check ((type in ('WEBSITE','INSTAGRAM','FACEBOOK','TWITTER','LINKEDIN','YOUTUBE','TIKTOK'))), url varchar(2048) not null, primary key (interest_group_id, type, url));
+create table interest_group_links (interest_group_id uuid not null, type varchar(50) not null check ((type in ('WEBSITE','INSTAGRAM','FACEBOOK','TWITTER','LINKEDIN','YOUTUBE','TIKTOK'))), url varchar(255) not null, primary key (interest_group_id, type, url));
 create table interest_group_membership (joined_at timestamp(6), interest_group_id uuid not null, user_id uuid not null, role varchar(255) check ((role in ('ADMIN','MEMBER'))), status varchar(255) check ((status in ('ACCEPTED','PENDING','DENIED','WITHDREW','BANNED'))), primary key (interest_group_id, user_id));
 create table interest_group_tags (interest_group_id uuid not null, tags varchar(100));
 alter table if exists interest_group_links add constraint FK3519psi1d5n0prhs7ectxqyfy foreign key (interest_group_id) references interest_groups;
 alter table if exists interest_group_membership add constraint FK969x3gmh9kq16vevdr74h0t3g foreign key (interest_group_id) references interest_groups;
 alter table if exists interest_group_tags add constraint FKcbscsmlvmrmdqc0ih8c6dlgkk foreign key (interest_group_id) references interest_groups;
 
+create table venues (deleted boolean not null, latitude double precision, longitude double precision, created_at timestamp(6), created_by uuid, id uuid not null, postcode varchar(50), country varchar(100), address_line varchar(500), location_label varchar(500), description varchar(4000) not null, city varchar(255), name varchar(255) not null, place_id varchar(255), primary key (id));
+comment on column venues.deleted is 'Soft-delete indicator';
+create table venue_links (venue_id uuid not null, type varchar(50) not null check ((type in ('WEBSITE','INSTAGRAM','FACEBOOK','TWITTER','LINKEDIN','YOUTUBE','TIKTOK','ZOOM','TEAMS','GOOGLE_MEET'))), url varchar(255) not null, primary key (venue_id, type, url));
+create table venue_staff (joined_at timestamp(6), venue_id uuid not null, user_id uuid not null, role varchar(255) check ((role in ('ADMIN','MEMBER'))), status varchar(255) check ((status in ('ACCEPTED','PENDING','DENIED','WITHDREW','BANNED'))), primary key (venue_id, user_id));
+create table venue_tags (venue_id uuid not null, tags varchar(100));
+alter table if exists venue_links add constraint FKvenue_links_venue foreign key (venue_id) references venues;
+alter table if exists venue_staff add constraint FKvenue_staff_venue foreign key (venue_id) references venues;
+alter table if exists venue_tags add constraint FKvenue_tags_venue foreign key (venue_id) references venues;
+create index venues_geo_idx on venues using gist (
+    geography(st_setsrid(st_makepoint(longitude, latitude), 4326))
+) where latitude is not null and longitude is not null and deleted = false;
+
 create table event_interest_groups (event_id uuid not null, event_interest_groups uuid);
+create table event_venues (event_id uuid not null, event_venues uuid);
 create table event_participants (event_id uuid not null, user_id uuid not null, role varchar(255) check ((role in ('HOST','COHOST','GUEST'))), primary key (event_id, user_id));
 create table event_tags (event_id uuid not null, tag varchar(100));
-create table events (deleted boolean not null, created_at timestamp(6), end_time timestamp(6), start_time timestamp(6), created_by uuid, id uuid not null, description varchar(255) not null, name varchar(255) not null, visibility varchar(255) not null check ((visibility in ('PUBLIC','GROUP','PRIVATE'))), primary key (id));
+create table events (deleted boolean not null, created_at timestamp(6), end_time timestamp(6), start_time timestamp(6), created_by uuid, id uuid not null, location_kind varchar(32) check (location_kind in ('ADDRESS','VENUE','ONLINE')), venue_id uuid, location_label varchar(500), place_id varchar(255), latitude double precision, longitude double precision, address_line varchar(500), city varchar(255), postcode varchar(50), country varchar(100), description varchar(4000) not null, name varchar(255) not null, visibility varchar(255) not null check ((visibility in ('PUBLIC','GROUP','PRIVATE'))), primary key (id));
 comment on column events.deleted is 'Soft-delete indicator';
-create table reservations (guests integer not null, event_id uuid not null, user_id uuid not null, payload varchar(255), status varchar(255) check ((status in ('PENDING','ACCEPTED','WHITELIST','DENIED','WITHDREW'))), primary key (event_id, user_id));
+create table event_links (event_id uuid not null, type varchar(50) not null check ((type in ('WEBSITE','INSTAGRAM','FACEBOOK','TWITTER','LINKEDIN','YOUTUBE','TIKTOK','ZOOM','TEAMS','GOOGLE_MEET'))), url varchar(255) not null, primary key (event_id, type, url));
+create table reservations (guests integer not null, event_id uuid not null, user_id uuid not null, payload varchar(4000), status varchar(255) check ((status in ('PENDING','ACCEPTED','WHITELIST','DENIED','WITHDREW'))), primary key (event_id, user_id));
 alter table if exists event_interest_groups add constraint FK9pyxt3n5c0gtivo6y3nxyw5fg foreign key (event_id) references events;
+alter table if exists event_venues add constraint FKevent_venues_event foreign key (event_id) references events;
 alter table if exists event_participants add constraint FK2x391urx4up03f4jp2y9mdt5x foreign key (event_id) references events;
 alter table if exists event_tags add constraint FKiwoyitw224ykom58m5xnoa9y6 foreign key (event_id) references events;
+alter table if exists event_links add constraint fk_event_links_event foreign key (event_id) references events;
 alter table if exists reservations add constraint FKcnr8finplwp8whntrr02jpvre foreign key (event_id) references events;
+create index events_geo_idx on events using gist (
+    geography(st_setsrid(st_makepoint(longitude, latitude), 4326))
+) where latitude is not null and longitude is not null and deleted = false;

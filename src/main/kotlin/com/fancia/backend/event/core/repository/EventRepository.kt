@@ -44,4 +44,75 @@ interface EventRepository : JpaRepository<Event, UUID> {
     ): Page<Event>
 
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event?
+
+    @Query(
+        value = """
+            SELECT e.* FROM events e
+            WHERE e.deleted = false
+              AND e.latitude IS NOT NULL
+              AND e.longitude IS NOT NULL
+              AND (
+                (:interestGroupId IS NULL AND e.visibility = 'PUBLIC')
+                OR (
+                  :interestGroupId IS NOT NULL
+                  AND (
+                    e.visibility = 'PUBLIC'
+                    OR (
+                      e.visibility = 'GROUP'
+                      AND EXISTS (
+                        SELECT 1 FROM event_interest_groups eig
+                        WHERE eig.event_id = e.id
+                          AND eig.event_interest_groups = :interestGroupId
+                      )
+                    )
+                  )
+                )
+              )
+              AND ST_DWithin(
+                geography(ST_SetSRID(ST_MakePoint(e.longitude, e.latitude), 4326)),
+                geography(ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)),
+                :radiusMeters
+              )
+            ORDER BY ST_Distance(
+                geography(ST_SetSRID(ST_MakePoint(e.longitude, e.latitude), 4326)),
+                geography(ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+            )
+        """,
+        countQuery = """
+            SELECT count(*) FROM events e
+            WHERE e.deleted = false
+              AND e.latitude IS NOT NULL
+              AND e.longitude IS NOT NULL
+              AND (
+                (:interestGroupId IS NULL AND e.visibility = 'PUBLIC')
+                OR (
+                  :interestGroupId IS NOT NULL
+                  AND (
+                    e.visibility = 'PUBLIC'
+                    OR (
+                      e.visibility = 'GROUP'
+                      AND EXISTS (
+                        SELECT 1 FROM event_interest_groups eig
+                        WHERE eig.event_id = e.id
+                          AND eig.event_interest_groups = :interestGroupId
+                      )
+                    )
+                  )
+                )
+              )
+              AND ST_DWithin(
+                geography(ST_SetSRID(ST_MakePoint(e.longitude, e.latitude), 4326)),
+                geography(ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)),
+                :radiusMeters
+              )
+        """,
+        nativeQuery = true,
+    )
+    fun findNearby(
+        @Param("lat") lat: Double,
+        @Param("lng") lng: Double,
+        @Param("radiusMeters") radiusMeters: Double,
+        @Param("interestGroupId") interestGroupId: UUID?,
+        pageable: Pageable,
+    ): Page<Event>
 }

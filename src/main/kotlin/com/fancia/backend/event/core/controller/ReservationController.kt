@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
@@ -34,7 +35,7 @@ class ReservationController(
     @PostMapping("/{eventId}/reservations")
     fun createReservation(
         @PathVariable eventId: UUID,
-        @RequestBody request: CreateReservationRequest,
+        @RequestBody @Valid request: CreateReservationRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ResponseEntity<ReservationResponse> {
         return ResponseEntity.ok(reservationService.create(eventId, request, jwt))
@@ -44,7 +45,7 @@ class ReservationController(
     fun updateReservation(
         @PathVariable eventId: UUID,
         @PathVariable userId: UUID,
-        @RequestBody request: UpdateReservationRequest,
+        @RequestBody @Valid request: UpdateReservationRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ResponseEntity<ReservationResponse> {
         return ResponseEntity.ok(reservationService.update(eventId, userId, request, jwt))

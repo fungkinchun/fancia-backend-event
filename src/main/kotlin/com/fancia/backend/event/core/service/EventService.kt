@@ -7,6 +7,7 @@ import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.mapper.EventMapper
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
+import com.fancia.backend.shared.common.social.core.entity.Link
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
@@ -25,7 +26,8 @@ import java.util.*
 class EventService(
     private val eventRepository: EventRepository,
     private val eventMapper: EventMapper,
-    private val commonServiceClient: CommonServiceClient
+    private val commonServiceClient: CommonServiceClient,
+    private val eventLocationResolver: EventLocationResolver,
 ) {
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event? {
         return eventRepository.findByIdAndCreatedBy(id, createdBy)
@@ -49,6 +51,9 @@ class EventService(
             val response = commonServiceClient.getTags(request.tags)
             it.tags.clear()
             it.tags.addAll(response.map { t -> t.name })
+            it.links.clear()
+            it.links.addAll(request.links.map { link -> Link(type = link.type, url = link.url) })
+            eventLocationResolver.apply(it, request.location)
             val event = eventRepository.save(it).let(eventMapper::toDto)
             event.id?.let { eventId ->
                 val createdBy = EventParticipant(
@@ -74,6 +79,9 @@ class EventService(
         return eventRepository.save(
             eventMapper.toBean(request, event).apply {
                 this.visibility = visibility
+                this.links.clear()
+                this.links.addAll(request.links.map { link -> Link(type = link.type, url = link.url) })
+                eventLocationResolver.apply(this, request.location)
             }
         ).let(eventMapper::toDto)
     }
@@ -83,8 +91,22 @@ class EventService(
         description: String?,
         tags: String?,
         interestGroupId: UUID?,
+        latitude: Double?,
+        longitude: Double?,
+        radiusKm: Double?,
         pageable: Pageable
     ): Page<EventResponse> {
+        if (latitude != null && longitude != null && radiusKm != null) {
+            val radiusMeters = radiusKm * 1000
+            return eventRepository.findNearby(
+                latitude,
+                longitude,
+                radiusMeters,
+                interestGroupId,
+                pageable,
+            ).map(eventMapper::toDto)
+        }
+
         return eventRepository.findAll(
             name?.trim() ?: "",
             description?.trim() ?: "",

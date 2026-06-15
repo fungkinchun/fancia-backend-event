@@ -58,6 +58,10 @@ spring:
             url: ${USER_SERVICE_URL:#{null}}
           user-internal-service:
             url: ${USER_INTERNAL_SERVICE_URL:#{null}}
+          venue-service:
+            url: ${VENUE_SERVICE_URL:#{null}}
+          venue-internal-service:
+            url: ${VENUE_INTERNAL_SERVICE_URL:#{null}}
           interestgroup-service:
             url: ${INTERESTGROUP_SERVICE_URL:#{null}}
           interestgroup-internal-service:
@@ -76,6 +80,11 @@ spring:
       properties:
         spring.json.trusted.packages: com.fancia.backend.shared.user.core.message
     bootstrap-servers: bootstrap.${DOMAIN_NAME}:9094
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    placeholders:
+      gis_admin_password: ${GIS_ADMIN_PASSWORD}
 app:
   application-name: ${PROJECT_NAME}-backend-${REPO_NAME}
   base-url: ${DOMAIN_NAME}/${REPO_NAME}/api

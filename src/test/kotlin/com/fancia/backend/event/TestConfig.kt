@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.DynamicPropertyRegistrar
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.kafka.KafkaContainer
+import org.testcontainers.utility.DockerImageName
 import org.wiremock.integrations.testcontainers.WireMockContainer
 import software.amazon.awssdk.services.s3.S3Client
 
@@ -17,7 +18,10 @@ class TestConfig {
     @Bean
     @ServiceConnection
     fun postgres(): PostgreSQLContainer<*> {
-        return PostgreSQLContainer("postgres:16-alpine")
+        return PostgreSQLContainer(
+            DockerImageName.parse("postgis/postgis:16-3.4-alpine")
+                .asCompatibleSubstituteFor("postgres")
+        )
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test")
@@ -46,6 +50,9 @@ class TestConfig {
             registry.add("spring.cloud.openfeign.client.config.common-internal-service.url") {
                 wiremock.baseUrl
             }
+            registry.add("spring.cloud.openfeign.client.config.venue-service.url") {
+                wiremock.baseUrl
+            }
         }
     }
 
@@ -61,6 +68,7 @@ class TestConfig {
         DynamicPropertyRegistrar { registry ->
             registry.add("spring.jpa.hibernate.ddl-auto") { "none" }
             registry.add("spring.flyway.enabled") { "true" }
+            registry.add("spring.flyway.placeholders.gis_admin_password") { "test-gis-admin" }
             registry.add("spring.cloud.aws.secretsmanager.enabled") { "false" }
             registry.add("spring.cloud.aws.region.static") { "us-east-1" }
             registry.add("spring.kafka.listener.auto-startup") { "false" }

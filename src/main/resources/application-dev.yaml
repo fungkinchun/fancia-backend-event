@@ -8,6 +8,8 @@ spring:
       - aws-secretsmanager:${ENV}/${PROJECT_NAME}/smtp
       - aws-secretsmanager:${ENV}/${PROJECT_NAME}/s3
       - aws-secretsmanager:${ENV}/${PROJECT_NAME}/kafka
+      - aws-secretsmanager:${ENV}/${PROJECT_NAME}/oauth2
+      - aws-secretsmanager:${ENV}/${PROJECT_NAME}/gis
   security:
     oauth2:
       resourceserver:
@@ -64,6 +66,10 @@ spring:
             url: ${USER_SERVICE_URL:#{null}}
           user-internal-service:
             url: ${USER_INTERNAL_SERVICE_URL:#{null}}
+          venue-service:
+            url: ${VENUE_SERVICE_URL:#{null}}
+          venue-internal-service:
+            url: ${VENUE_INTERNAL_SERVICE_URL:#{null}}
           interestgroup-service:
             url: ${INTERESTGROUP_SERVICE_URL:#{null}}
           interestgroup-internal-service:
@@ -90,6 +96,11 @@ spring:
       ssl.keystore.certificate.chain: ${KAFKA_SSL_KEYSTORE_CERTIFICATE_CHAIN}
       ssl.keystore.key: ${KAFKA_SSL_KEYSTORE_KEY}
       auto.register.schemas: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    placeholders:
+      gis_admin_password: ${GIS_ADMIN_PASSWORD}
 app:
   application-name: ${PROJECT_NAME}-backend-${REPO_NAME}
   base-url: ${DOMAIN_NAME}/${REPO_NAME}/api
@@ -111,6 +122,3 @@ management:
     prometheus:
       enabled: true
 
-flyway:
-  enabled: true
-  locations: classpath:db/migration
