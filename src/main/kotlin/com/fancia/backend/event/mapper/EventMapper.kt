@@ -2,12 +2,10 @@ package com.fancia.backend.event.mapper
 
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.support.EventLocationSupport
-import com.fancia.backend.shared.common.tag.core.mapper.TagResponseMapper
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
 import org.mapstruct.*
-import org.springframework.beans.factory.annotation.Autowired
 
 @Mapper(
     componentModel = "spring",
@@ -17,11 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired
     unmappedTargetPolicy = ReportingPolicy.IGNORE
 )
 abstract class EventMapper {
-    @Autowired
-    protected lateinit var tagResponseMapper: TagResponseMapper
-
     @Mapping(target = "location", ignore = true)
-    @Mapping(target = "tags", ignore = true)
     abstract fun toDto(event: Event): EventResponse
 
     @Mapping(target = "links", ignore = true)
@@ -51,6 +45,18 @@ abstract class EventMapper {
     @Mapping(target = "postcode", ignore = true)
     @Mapping(target = "country", ignore = true)
     abstract fun toBean(event: UpdateEventRequest): Event
+
+    @Mapping(target = "links", ignore = true)
+    @Mapping(target = "locationKind", ignore = true)
+    @Mapping(target = "venueId", ignore = true)
+    @Mapping(target = "locationLabel", ignore = true)
+    @Mapping(target = "placeId", ignore = true)
+    @Mapping(target = "latitude", ignore = true)
+    @Mapping(target = "longitude", ignore = true)
+    @Mapping(target = "addressLine", ignore = true)
+    @Mapping(target = "city", ignore = true)
+    @Mapping(target = "postcode", ignore = true)
+    @Mapping(target = "country", ignore = true)
     abstract fun toBean(response: EventResponse): Event
 
     @Mapping(target = "links", ignore = true)
@@ -83,10 +89,5 @@ abstract class EventMapper {
     @AfterMapping
     fun mapLocationToDto(event: Event, @MappingTarget response: EventResponse) {
         response.location = EventLocationSupport.toDto(event)
-    }
-
-    @AfterMapping
-    fun mapTagsToDto(event: Event, @MappingTarget response: EventResponse) {
-        response.tags = tagResponseMapper.fromIds(event.tags)
     }
 }

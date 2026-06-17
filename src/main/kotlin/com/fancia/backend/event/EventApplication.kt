@@ -18,21 +18,14 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
     basePackages = [
         "com.fancia.backend.event.core",
         "com.fancia.backend.shared.common.core.entity",
-        "com.fancia.backend.shared.common.tag.core.entity",
     ]
 )
 @EnableJpaRepositories(
     basePackages = [
         "com.fancia.backend.event.core.repository",
-        "com.fancia.backend.shared.common.tag.core.repository",
     ]
 )
-@SpringBootApplication(
-    scanBasePackages = [
-        "com.fancia.backend.event",
-        "com.fancia.backend.shared.common.tag.core",
-    ]
-)
+@SpringBootApplication(scanBasePackages = ["com.fancia.backend.event"])
 @EnableFeignClients
 class EventApplication
 

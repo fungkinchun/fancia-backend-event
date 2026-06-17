@@ -120,6 +120,7 @@ class EventControllerIntegrationTest(
     }
 
     test("should list events") {
+        val event = eventRepository.findAll().first { it.name == "testEvent" }
         mockMvc
             .get("/api/events?tags=good&page=0&size=3") {
                 accept = APPLICATION_JSON
@@ -129,7 +130,7 @@ class EventControllerIntegrationTest(
                 status { isOk() }
                 jsonPath("$.totalElements", `is`(1))
                 jsonPath("$.content[0].name", `is`("testEvent"))
-                jsonPath("$.content[0].tags[0].name", `is`("good"))
+                jsonPath("$.content[0].tags[0]", `is`(event.tags.first().toString()))
                 jsonPath("$.content[0].visibility", `is`("PUBLIC"))
             }
     }
