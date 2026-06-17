@@ -13,8 +13,10 @@ create table uploaded_file (deleted boolean not null, created_at timestamp(6), s
 comment on column uploaded_file.deleted is 'Soft-delete indicator';
 create table user_links (user_id uuid not null, type varchar(50) not null check ((type in ('WEBSITE','INSTAGRAM','FACEBOOK','TWITTER','LINKEDIN','YOUTUBE','TIKTOK'))), url varchar(255) not null, primary key (user_id, type, url));
 create table user_privileges (privilege_id uuid not null, user_id uuid not null, primary key (privilege_id, user_id));
-create table "users" (deleted boolean not null, verified boolean, created_at timestamp(6), created_by uuid, id uuid not null, email varchar(255), first_name varchar(255), last_name varchar(255), password varchar(255), profile_image_url varchar(255), role varchar(255) check ((role in ('USER','ADMIN'))), primary key (id));
+create table "users" (deleted boolean not null, status varchar(16) not null default 'REGISTERED' check (status in ('REGISTERED', 'ACTIVE', 'INACTIVE')), created_at timestamp(6), created_by uuid, id uuid not null, email varchar(255), first_name varchar(255), last_name varchar(255), password varchar(255), profile_image_url varchar(255), role varchar(255) check ((role in ('USER','ADMIN'))), bio varchar(4000), location_label varchar(500), birth_date date, gender varchar(1) check (gender in ('M', 'F')), visibility varchar(16) not null default 'PUBLIC' check (visibility in ('PUBLIC', 'PRIVATE')), primary key (id));
 comment on column "users".deleted is 'Soft-delete indicator';
+create table user_tags (user_id uuid not null, tags varchar(100));
+create table user_settings (user_id uuid primary key, privacy jsonb not null default '{}', notifications jsonb not null default '{}');
 create table verification_codes (deleted boolean not null, email_sent boolean not null, created_at timestamp(6), created_by uuid, id uuid not null, "user_id" uuid unique, code varchar(255), primary key (id));
 comment on column verification_codes.deleted is 'Soft-delete indicator';
 alter table if exists "authorization_consents" add constraint FK7u3rrcx79xyss37m2551mpx2p foreign key ("client_id") references "clients";
@@ -23,6 +25,8 @@ alter table if exists password_reset_tokens add constraint FKrjxrqd0dudi212f0469
 alter table if exists uploaded_file add constraint FKqhosch3tnq7i2it0mea57ts4m foreign key ("user_id") references "users";
 alter table if exists user_connected_accounts add constraint FKnnce63ye8wbmdskoeco5ku43d foreign key (user_id) references "users";
 alter table if exists user_links add constraint FK4wc3hhebo87m149hnxkxxmfvm foreign key (user_id) references "users";
+alter table if exists user_tags add constraint FK_user_tags_user foreign key (user_id) references "users";
+alter table if exists user_settings add constraint FK_user_settings_user foreign key (user_id) references "users";
 alter table if exists user_privileges add constraint FK6rrv8daxxrco69tdpfu3a29le foreign key (privilege_id) references privilege;
 alter table if exists user_privileges add constraint FKobuc3eaoytxqaj534be5b7xqs foreign key (user_id) references "users";
 alter table if exists verification_codes add constraint FK2c664upaiv1f6h7e5ueyy1ae3 foreign key ("user_id") references "users";
