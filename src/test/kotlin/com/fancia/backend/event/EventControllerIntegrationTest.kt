@@ -3,10 +3,13 @@ package com.fancia.backend.event
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.mapper.EventMapper
+import com.fancia.backend.shared.common.tag.core.entity.Tag
+import com.fancia.backend.shared.common.tag.core.enums.TagType
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import jakarta.persistence.EntityManager
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
@@ -34,7 +37,8 @@ class EventControllerIntegrationTest(
     private val wiremock: WireMockContainer,
     private val eventRepository: EventRepository,
     private val jsonMapper: JsonMapper,
-    private val eventMapper: EventMapper
+    private val eventMapper: EventMapper,
+    private val entityManager: EntityManager,
 ) : FunSpec({
     val testInterestGroupId = UUID.randomUUID()
 
@@ -45,33 +49,47 @@ class EventControllerIntegrationTest(
         )
     }
 
-    test("should create a new event") {
-        val testUserId = UUID.randomUUID()
-        val mockResponse = mapOf(
-            "content" to listOf(
-                mapOf(
-                    "name" to "good"
-                )
-            ),
-            "totalElements" to 1,
-            "totalPages" to 1,
-            "size" to 20,
-            "number" to 0
-        )
+    fun persistTopicTag(name: String): Tag {
+        val tag = Tag(name = name, type = TagType.TOPIC)
+        entityManager.persist(tag)
+        entityManager.flush()
+        return tag
+    }
+
+    fun stubTopicTag(tag: Tag) {
         stubFor(
             get(urlPathEqualTo("/api/tags"))
-                .withQueryParam("search", equalTo("good"))
+                .withQueryParam("search", equalTo(tag.name))
+                .withQueryParam("type", equalTo("TOPIC"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(
                             jsonMapper.writeValueAsString(
-                                mockResponse
-                            )
-                        )
-                )
+                                mapOf(
+                                    "content" to listOf(
+                                        mapOf(
+                                            "id" to tag.id.toString(),
+                                            "name" to tag.name,
+                                            "type" to "TOPIC",
+                                        ),
+                                    ),
+                                    "totalElements" to 1,
+                                    "totalPages" to 1,
+                                    "size" to 20,
+                                    "number" to 0,
+                                ),
+                            ),
+                        ),
+                ),
         )
+    }
+
+    test("should create a new event") {
+        val testUserId = UUID.randomUUID()
+        val goodTag = persistTopicTag("good")
+        stubTopicTag(goodTag)
         val response = mockMvc
             .post("/api/events") {
                 with(jwt().jwt {
@@ -83,7 +101,7 @@ class EventControllerIntegrationTest(
                     "startTime" to "2024-06-01T10:00:00",
                     "duration" to "PT2H",
                     "interestGroups" to listOf(testInterestGroupId),
-                    "tags" to listOf("good"),
+                    "tags" to listOf(mapOf("name" to "good", "type" to "TOPIC")),
                     "visibility" to "PUBLIC",
                 )
                 content = jsonMapper.writeValueAsString(requestBody)
@@ -111,7 +129,7 @@ class EventControllerIntegrationTest(
                 status { isOk() }
                 jsonPath("$.totalElements", `is`(1))
                 jsonPath("$.content[0].name", `is`("testEvent"))
-                jsonPath("$.content[0].tags[0]", `is`("good"))
+                jsonPath("$.content[0].tags[0].name", `is`("good"))
                 jsonPath("$.content[0].visibility", `is`("PUBLIC"))
             }
     }
@@ -143,26 +161,8 @@ class EventControllerIntegrationTest(
 
     test("should not list private events but allow direct access by id") {
         val testUserId = UUID.randomUUID()
-        stubFor(
-            get(urlPathEqualTo("/api/tags"))
-                .withQueryParam("search", equalTo("secret"))
-                .willReturn(
-                    aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(
-                            jsonMapper.writeValueAsString(
-                                mapOf(
-                                    "content" to listOf(mapOf("name" to "secret")),
-                                    "totalElements" to 1,
-                                    "totalPages" to 1,
-                                    "size" to 20,
-                                    "number" to 0,
-                                )
-                            )
-                        )
-                )
-        )
+        val secretTag = persistTopicTag("secret")
+        stubTopicTag(secretTag)
         val createResponse = mockMvc
             .post("/api/events") {
                 with(jwt().jwt { it.claim("userId", testUserId) })
@@ -173,7 +173,7 @@ class EventControllerIntegrationTest(
                         "startTime" to "2024-06-02T10:00:00",
                         "duration" to "PT1H",
                         "interestGroups" to listOf(testInterestGroupId),
-                        "tags" to listOf("secret"),
+                        "tags" to listOf(mapOf("name" to "secret", "type" to "TOPIC")),
                         "visibility" to "PRIVATE",
                     )
                 )

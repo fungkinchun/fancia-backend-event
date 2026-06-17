@@ -8,6 +8,7 @@ import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.mapper.EventMapper
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.social.core.entity.Link
+import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
@@ -48,9 +49,7 @@ class EventService(
         eventMapper.toBean(request).let {
             it.createdBy = currentUserId
             it.visibility = visibility
-            val response = commonServiceClient.getTags(request.tags)
-            it.tags.clear()
-            it.tags.addAll(response.map { t -> t.name })
+            applyTags(it.tags, request.tags)
             it.links.clear()
             it.links.addAll(request.links.map { link -> Link(type = link.type, url = link.url) })
             eventLocationResolver.apply(it, request.location)
@@ -79,11 +78,23 @@ class EventService(
         return eventRepository.save(
             eventMapper.toBean(request, event).apply {
                 this.visibility = visibility
+                applyTags(this.tags, request.tags)
                 this.links.clear()
                 this.links.addAll(request.links.map { link -> Link(type = link.type, url = link.url) })
                 eventLocationResolver.apply(this, request.location)
             }
         ).let(eventMapper::toDto)
+    }
+
+    @Transactional
+    fun removeTagFromAllEvents(tagId: UUID) {
+        val eventsWithTag = eventRepository.findByTagId(tagId)
+        for (event in eventsWithTag) {
+            event.tags.remove(tagId)
+        }
+        if (eventsWithTag.isNotEmpty()) {
+            eventRepository.saveAll(eventsWithTag)
+        }
     }
 
     fun findAll(
@@ -114,6 +125,18 @@ class EventService(
             interestGroupId,
             pageable
         ).map(eventMapper::toDto)
+    }
+
+    private fun applyTags(tags: MutableSet<UUID>, requestTags: Set<TagItemRequest>) {
+        val resolved = requestTags
+            .groupBy { it.type }
+            .flatMap { (type, items) ->
+                val names = items.map { it.name }.toSet()
+                if (names.isEmpty()) emptyList() else commonServiceClient.getTags(names, type).content
+            }
+            .mapNotNull { it.id }
+        tags.clear()
+        tags.addAll(resolved)
     }
 
     private fun validateVisibility(visibility: EventVisibility, interestGroups: Set<UUID>) {

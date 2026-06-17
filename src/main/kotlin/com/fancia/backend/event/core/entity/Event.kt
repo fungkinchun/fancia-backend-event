@@ -35,9 +35,9 @@ class Event : AbstractEntity() {
     val reservations: MutableSet<Reservation> = mutableSetOf<Reservation>()
 
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable
-    @Column(name = "tag", length = 100)
-    var tags: MutableSet<String> = mutableSetOf()
+    @CollectionTable(name = "event_tags", joinColumns = [JoinColumn(name = "event_id")])
+    @Column(name = "tag_id")
+    var tags: MutableSet<UUID> = mutableSetOf()
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "event_links", joinColumns = [JoinColumn(name = "event_id")])
@@ -46,7 +46,6 @@ class Event : AbstractEntity() {
     @Enumerated(EnumType.STRING)
     @Column(length = 32)
     var locationKind: EventLocationKind? = null
-
     var venueId: UUID? = null
 
     @Column(length = 500)
@@ -54,9 +53,7 @@ class Event : AbstractEntity() {
 
     @Column(length = 255)
     var placeId: String? = null
-
     var latitude: Double? = null
-
     var longitude: Double? = null
 
     @Column(length = 500)

@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.boot.runApplication
 import org.springframework.cloud.openfeign.EnableFeignClients
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 @SecurityScheme(
     name = "bearerAuth",
@@ -16,10 +17,22 @@ import org.springframework.cloud.openfeign.EnableFeignClients
 @EntityScan(
     basePackages = [
         "com.fancia.backend.event.core",
-        "com.fancia.backend.shared.common.core.entity"
+        "com.fancia.backend.shared.common.core.entity",
+        "com.fancia.backend.shared.common.tag.core.entity",
     ]
 )
-@SpringBootApplication
+@EnableJpaRepositories(
+    basePackages = [
+        "com.fancia.backend.event.core.repository",
+        "com.fancia.backend.shared.common.tag.core.repository",
+    ]
+)
+@SpringBootApplication(
+    scanBasePackages = [
+        "com.fancia.backend.event",
+        "com.fancia.backend.shared.common.tag.core",
+    ]
+)
 @EnableFeignClients
 class EventApplication
 

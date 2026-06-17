@@ -5,16 +5,14 @@ import com.fancia.backend.event.core.entity.Reservation
 import com.fancia.backend.event.core.repository.ReservationRepository
 import com.fancia.backend.event.mapper.EventMapper
 import com.fancia.backend.event.mapper.ReservationMapper
+import com.fancia.backend.shared.common.tag.core.entity.Tag
+import com.fancia.backend.shared.common.tag.core.enums.TagType
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.ReservationResponse
-import com.github.tomakehurst.wiremock.client.WireMock.aResponse
-import com.github.tomakehurst.wiremock.client.WireMock.configureFor
-import com.github.tomakehurst.wiremock.client.WireMock.equalTo
-import com.github.tomakehurst.wiremock.client.WireMock.get
-import com.github.tomakehurst.wiremock.client.WireMock.stubFor
-import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import jakarta.persistence.EntityManager
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
@@ -39,6 +37,7 @@ class ReservationControllerIntegrationTest(
     private val jsonMapper: JsonMapper,
     private val eventMapper: EventMapper,
     private val wiremock: WireMockContainer,
+    private val entityManager: EntityManager,
 ) : FunSpec({
     beforeSpec {
         configureFor(
@@ -47,12 +46,18 @@ class ReservationControllerIntegrationTest(
         )
     }
 
-    test("should create a new event") {
-        val testUserId = UUID.randomUUID()
-        val testInterestGroupId = UUID.randomUUID()
+    fun persistTopicTag(name: String): Tag {
+        val tag = Tag(name = name, type = TagType.TOPIC)
+        entityManager.persist(tag)
+        entityManager.flush()
+        return tag
+    }
+
+    fun stubTopicTag(tag: Tag) {
         stubFor(
             get(urlPathEqualTo("/api/tags"))
-                .withQueryParam("search", equalTo("good"))
+                .withQueryParam("search", equalTo(tag.name))
+                .withQueryParam("type", equalTo("TOPIC"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -60,16 +65,29 @@ class ReservationControllerIntegrationTest(
                         .withBody(
                             jsonMapper.writeValueAsString(
                                 mapOf(
-                                    "content" to listOf(mapOf("name" to "good")),
+                                    "content" to listOf(
+                                        mapOf(
+                                            "id" to tag.id.toString(),
+                                            "name" to tag.name,
+                                            "type" to "TOPIC",
+                                        ),
+                                    ),
                                     "totalElements" to 1,
                                     "totalPages" to 1,
                                     "size" to 20,
                                     "number" to 0,
-                                )
-                            )
-                        )
-                )
+                                ),
+                            ),
+                        ),
+                ),
         )
+    }
+
+    test("should create a new event") {
+        val testUserId = UUID.randomUUID()
+        val testInterestGroupId = UUID.randomUUID()
+        val goodTag = persistTopicTag("good")
+        stubTopicTag(goodTag)
         val response = mockMvc
             .post("/api/events") {
                 with(jwt().jwt {
@@ -81,7 +99,7 @@ class ReservationControllerIntegrationTest(
                     "startTime" to "2024-06-01T10:00:00",
                     "duration" to "PT2H",
                     "interestGroups" to listOf(testInterestGroupId),
-                    "tags" to listOf("good"),
+                    "tags" to listOf(mapOf("name" to "good", "type" to "TOPIC")),
                     "visibility" to "PUBLIC",
                 )
                 content = jsonMapper.writeValueAsString(requestBody)

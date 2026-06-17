@@ -29,7 +29,7 @@ interface EventRepository : JpaRepository<Event, UUID> {
            OR trgm_word_similarity(:name, e.name) = true
            OR trgm_word_similarity(:description, e.description) = true
            OR trgm_word_similarity(:tags,
-              (SELECT LISTAGG(t, ',') WITHIN GROUP (ORDER BY t) FROM e.tags t)
+              (SELECT LISTAGG(t.name, ',') WITHIN GROUP (ORDER BY t.name) FROM Tag t WHERE t.id IN elements(e.tags))
            ) = true
       )
     GROUP BY e
@@ -44,6 +44,9 @@ interface EventRepository : JpaRepository<Event, UUID> {
     ): Page<Event>
 
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event?
+
+    @Query("SELECT e FROM Event e WHERE :tagId MEMBER OF e.tags")
+    fun findByTagId(@Param("tagId") tagId: UUID): List<Event>
 
     @Query(
         value = """
