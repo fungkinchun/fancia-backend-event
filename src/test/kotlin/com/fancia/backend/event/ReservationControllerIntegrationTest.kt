@@ -3,16 +3,12 @@ package com.fancia.backend.event
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.entity.Reservation
 import com.fancia.backend.event.core.repository.ReservationRepository
-import com.fancia.backend.event.mapper.EventMapper
-import com.fancia.backend.event.mapper.ReservationMapper
-import com.fancia.backend.shared.common.tag.core.entity.Tag
-import com.fancia.backend.shared.common.tag.core.enums.TagType
+import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import jakarta.persistence.EntityManager
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
@@ -35,9 +31,7 @@ class ReservationControllerIntegrationTest(
     private val mockMvc: MockMvc,
     private val reservationRepository: ReservationRepository,
     private val jsonMapper: JsonMapper,
-    private val eventMapper: EventMapper,
     private val wiremock: WireMockContainer,
-    private val entityManager: EntityManager,
 ) : FunSpec({
     beforeSpec {
         configureFor(
@@ -46,48 +40,40 @@ class ReservationControllerIntegrationTest(
         )
     }
 
-    fun persistTopicTag(name: String): Tag {
-        val tag = Tag(name = name, type = TagType.TOPIC)
-        entityManager.persist(tag)
-        entityManager.flush()
-        return tag
-    }
-
-    fun stubTopicTag(tag: Tag) {
+    fun stubCreateTag(name: String): UUID {
+        val tagId = UUID.randomUUID()
         stubFor(
-            get(urlPathEqualTo("/api/tags"))
-                .withQueryParam("search", equalTo(tag.name))
-                .withQueryParam("type", equalTo("TOPIC"))
+            post(urlPathEqualTo("/api/tags"))
                 .willReturn(
                     aResponse()
-                        .withStatus(200)
+                        .withStatus(201)
                         .withHeader("Content-Type", "application/json")
                         .withBody(
                             jsonMapper.writeValueAsString(
                                 mapOf(
                                     "content" to listOf(
                                         mapOf(
-                                            "id" to tag.id.toString(),
-                                            "name" to tag.name,
+                                            "id" to tagId.toString(),
+                                            "name" to name,
                                             "type" to "TOPIC",
                                         ),
                                     ),
                                     "totalElements" to 1,
                                     "totalPages" to 1,
-                                    "size" to 20,
+                                    "size" to 1,
                                     "number" to 0,
                                 ),
                             ),
                         ),
                 ),
         )
+        return tagId
     }
 
     test("should create a new event") {
         val testUserId = UUID.randomUUID()
         val testInterestGroupId = UUID.randomUUID()
-        val goodTag = persistTopicTag("good")
-        stubTopicTag(goodTag)
+        stubCreateTag("good")
         val response = mockMvc
             .post("/api/events") {
                 with(jwt().jwt {
@@ -97,10 +83,11 @@ class ReservationControllerIntegrationTest(
                     "name" to "testEvent",
                     "description" to "string",
                     "startTime" to "2024-06-01T10:00:00",
-                    "duration" to "PT2H",
+                    "endTime" to "2024-06-01T12:00:00",
                     "interestGroups" to listOf(testInterestGroupId),
                     "tags" to listOf(mapOf("name" to "good", "type" to "TOPIC")),
                     "visibility" to "PUBLIC",
+                    "links" to emptyList<Any>(),
                 )
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
@@ -112,7 +99,7 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.name", `is`("testEvent"))
                 jsonPath("$.id", `is`(notNullValue()))
             }
-        val createdEvent = response.toEvent(jsonMapper, eventMapper)
+        val createdEvent = response.toEvent(jsonMapper)
         val createReservationResponse = mockMvc
             .post("/api/events/{eventId}/reservations", createdEvent.id) {
                 with(jwt().jwt {
@@ -227,24 +214,20 @@ class ReservationControllerIntegrationTest(
     }
 })
 
-private fun ResultActionsDsl.toEvent(jsonMapper: JsonMapper, eventMapper: EventMapper): Event =
+private fun ResultActionsDsl.toEvent(jsonMapper: JsonMapper): Event =
     andReturn()
         .response
         .contentAsString
         .let {
-            jsonMapper.readValue(it, object : TypeReference<EventResponse>() {}).let(
-                eventMapper::toBean
-            )
+            jsonMapper.readValue(it, object : TypeReference<EventResponse>() {})
+                .toEntity()
         }
 
-private fun ResultActionsDsl.toReservation(
-    jsonMapper: JsonMapper,
-    reservationMapper: ReservationMapper
-): Reservation =
+private fun ResultActionsDsl.toReservation(jsonMapper: JsonMapper): Reservation =
     andReturn()
         .response
         .contentAsString
         .let {
             jsonMapper.readValue(it, object : TypeReference<ReservationResponse>() {})
-                .let(reservationMapper::toBean)
+                .toEntity()
         }

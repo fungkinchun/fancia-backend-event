@@ -86,8 +86,8 @@ class EventController(
         @Parameter(description = "Fuzzy search term for event description")
         description: String?,
         @RequestParam(required = false)
-        @Parameter(description = "Fuzzy search term for tags, use comma to separate multiple tags")
-        tags: String? = null,
+        @Parameter(description = "Filter by tag ids (entities matching any of the ids)")
+        tagIds: List<UUID> = emptyList(),
         @RequestParam(required = false, name = "interestGroup")
         @Parameter(description = "Filter events linked to this interest group")
         interestGroup: UUID? = null,
@@ -103,7 +103,7 @@ class EventController(
         @PageableDefault(size = 20)
         pageable: Pageable
     ): ResponseEntity<Page<EventResponse>> {
-        val groups = eventService.findAll(name, description, tags, interestGroup, lat, lng, radiusKm, pageable)
+        val groups = eventService.findAll(name, description, tagIds, interestGroup, lat, lng, radiusKm, pageable)
         return ResponseEntity.ok(groups)
     }
 }

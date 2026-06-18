@@ -28,7 +28,7 @@ alter table if exists uploaded_file add constraint FKqhosch3tnq7i2it0mea57ts4m f
 alter table if exists user_connected_accounts add constraint FKnnce63ye8wbmdskoeco5ku43d foreign key (user_id) references "users";
 alter table if exists user_links add constraint FK4wc3hhebo87m149hnxkxxmfvm foreign key (user_id) references "users";
 alter table if exists user_tags add constraint FK_user_tags_user foreign key (user_id) references "users";
-alter table if exists user_tags add constraint FK_user_tags_tag foreign key (tag_id) references tags;
+-- tag_id references common-service tags (opaque UUID); no local FK
 alter table if exists user_settings add constraint FK_user_settings_user foreign key (user_id) references "users";
 alter table if exists user_privileges add constraint FK6rrv8daxxrco69tdpfu3a29le foreign key (privilege_id) references privilege;
 alter table if exists user_privileges add constraint FKobuc3eaoytxqaj534be5b7xqs foreign key (user_id) references "users";
@@ -54,7 +54,7 @@ create table interest_group_tags (interest_group_id uuid not null, tag_id uuid n
 alter table if exists interest_group_links add constraint FK3519psi1d5n0prhs7ectxqyfy foreign key (interest_group_id) references interest_groups;
 alter table if exists interest_group_membership add constraint FK969x3gmh9kq16vevdr74h0t3g foreign key (interest_group_id) references interest_groups;
 alter table if exists interest_group_tags add constraint FKcbscsmlvmrmdqc0ih8c6dlgkk foreign key (interest_group_id) references interest_groups;
-alter table if exists interest_group_tags add constraint FK_interest_group_tags_tag foreign key (tag_id) references tags;
+-- tag_id references common-service tags (opaque UUID); no local FK
 
 create table venues (deleted boolean not null, latitude double precision, longitude double precision, created_at timestamp(6), created_by uuid, id uuid not null, postcode varchar(50), country varchar(100), address_line varchar(500), location_label varchar(500), description varchar(4000) not null, city varchar(255), name varchar(255) not null, place_id varchar(255), primary key (id));
 comment on column venues.deleted is 'Soft-delete indicator';
@@ -64,7 +64,7 @@ create table venue_tags (venue_id uuid not null, tag_id uuid not null, primary k
 alter table if exists venue_links add constraint FKvenue_links_venue foreign key (venue_id) references venues;
 alter table if exists venue_staff add constraint FKvenue_staff_venue foreign key (venue_id) references venues;
 alter table if exists venue_tags add constraint FKvenue_tags_venue foreign key (venue_id) references venues;
-alter table if exists venue_tags add constraint FK_venue_tags_tag foreign key (tag_id) references tags;
+-- tag_id references common-service tags (opaque UUID); no local FK
 create index venues_geo_idx on venues using gist (
     geography(st_setsrid(st_makepoint(longitude, latitude), 4326))
 ) where latitude is not null and longitude is not null and deleted = false;
@@ -81,7 +81,7 @@ alter table if exists event_interest_groups add constraint FK9pyxt3n5c0gtivo6y3n
 alter table if exists event_venues add constraint FKevent_venues_event foreign key (event_id) references events;
 alter table if exists event_participants add constraint FK2x391urx4up03f4jp2y9mdt5x foreign key (event_id) references events;
 alter table if exists event_tags add constraint FKiwoyitw224ykom58m5xnoa9y6 foreign key (event_id) references events;
-alter table if exists event_tags add constraint FK_event_tags_tag foreign key (tag_id) references tags;
+-- tag_id references common-service tags (opaque UUID); no local FK
 alter table if exists event_links add constraint fk_event_links_event foreign key (event_id) references events;
 alter table if exists reservations add constraint FKcnr8finplwp8whntrr02jpvre foreign key (event_id) references events;
 create index events_geo_idx on events using gist (

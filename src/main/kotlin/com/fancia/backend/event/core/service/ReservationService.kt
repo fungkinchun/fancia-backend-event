@@ -6,7 +6,8 @@ import com.fancia.backend.event.core.entity.ReservationId
 import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
-import com.fancia.backend.event.mapper.ReservationMapper
+import com.fancia.backend.event.mapper.toDto
+import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
 import com.fancia.backend.shared.event.core.dto.ReservationResponse
@@ -26,7 +27,6 @@ class ReservationService(
     private val eventRepository: EventRepository,
     private val eventParticipantRepository: EventParticipantRepository,
     private val reservationRepository: ReservationRepository,
-    private val reservationMapper: ReservationMapper,
 ) {
     @Transactional
     fun create(eventId: UUID, request: @Valid CreateReservationRequest, jwt: Jwt): ReservationResponse {
@@ -37,13 +37,13 @@ class ReservationService(
         if (reservationRepository.existsByIdEventIdAndIdUserId(eventId, currentUserId)) {
             throw ReservationAlreadyExistsException(eventId, currentUserId)
         }
-        val reservation = reservationMapper.toBean(request)
+        val reservation = request.toEntity()
         reservation.event = event
         reservation.id = ReservationId(
             eventId = event.id!!,
             currentUserId
         )
-        return reservationRepository.save(reservation).let(reservationMapper::toDto)
+        return reservationRepository.save(reservation).toDto()
     }
 
     @Transactional
@@ -65,7 +65,7 @@ class ReservationService(
         }
         val reservation = reservationRepository.findByIdEventIdAndIdUserId(eventId, userId)
             ?: throw ReservationNotFoundException(eventId, userId)
-        reservationMapper.toBean(request, reservation)
+        request.toEntity(reservation)
         val event = eventRepository.findByIdOrNull(eventId)
             ?: throw EventNotFoundException(eventId)
 
@@ -92,6 +92,6 @@ class ReservationService(
 
             else -> {}
         }
-        return reservationMapper.toDto(reservationRepository.save(reservation))
+        return reservationRepository.save(reservation).toDto()
     }
 }

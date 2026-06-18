@@ -46,6 +46,7 @@ class Event : AbstractEntity() {
     @Enumerated(EnumType.STRING)
     @Column(length = 32)
     var locationKind: EventLocationKind? = null
+
     var venueId: UUID? = null
 
     @Column(length = 500)
@@ -53,7 +54,9 @@ class Event : AbstractEntity() {
 
     @Column(length = 255)
     var placeId: String? = null
+
     var latitude: Double? = null
+
     var longitude: Double? = null
 
     @Column(length = 500)

@@ -2,11 +2,8 @@ package com.fancia.backend.event
 
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.shared.common.comment.core.dto.CommentResponse
-import com.fancia.backend.shared.common.tag.core.entity.Tag
-import com.fancia.backend.shared.common.tag.core.enums.TagType
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
-import jakarta.persistence.EntityManager
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
@@ -32,7 +29,6 @@ class EventCommentControllerIntegrationTest(
     private val eventRepository: EventRepository,
     private val jsonMapper: JsonMapper,
     private val wiremock: WireMockContainer,
-    private val entityManager: EntityManager,
 ) : FunSpec({
     beforeSpec {
         configureFor(
@@ -45,48 +41,40 @@ class EventCommentControllerIntegrationTest(
         reset()
     }
 
-    fun persistTopicTag(name: String): Tag {
-        val tag = Tag(name = name, type = TagType.TOPIC)
-        entityManager.persist(tag)
-        entityManager.flush()
-        return tag
-    }
-
-    fun stubTopicTag(tag: Tag) {
+    fun stubCreateTag(name: String): UUID {
+        val tagId = UUID.randomUUID()
         stubFor(
-            get(urlPathEqualTo("/api/tags"))
-                .withQueryParam("search", equalTo(tag.name))
-                .withQueryParam("type", equalTo("TOPIC"))
+            post(urlPathEqualTo("/api/tags"))
                 .willReturn(
                     aResponse()
-                        .withStatus(200)
+                        .withStatus(201)
                         .withHeader("Content-Type", "application/json")
                         .withBody(
                             jsonMapper.writeValueAsString(
                                 mapOf(
                                     "content" to listOf(
                                         mapOf(
-                                            "id" to tag.id.toString(),
-                                            "name" to tag.name,
+                                            "id" to tagId.toString(),
+                                            "name" to name,
                                             "type" to "TOPIC",
                                         ),
                                     ),
                                     "totalElements" to 1,
                                     "totalPages" to 1,
-                                    "size" to 20,
+                                    "size" to 1,
                                     "number" to 0,
                                 ),
                             ),
                         ),
                 ),
         )
+        return tagId
     }
 
     fun createEventViaApi(userId: UUID): UUID {
         val testInterestGroupId = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val tagName = "test"
-        val tag = persistTopicTag(tagName)
-        stubTopicTag(tag)
+        stubCreateTag(tagName)
         val responseBody = mockMvc
             .post("/api/events") {
                 with(jwt().jwt { it.claim("userId", userId) })
@@ -95,10 +83,11 @@ class EventCommentControllerIntegrationTest(
                         "name" to "Comment Test Event",
                         "description" to "Event for comment integration tests",
                         "startTime" to "2024-06-01T10:00:00",
-                        "duration" to "PT2H",
+                        "endTime" to "2024-06-01T12:00:00",
                         "interestGroups" to listOf(testInterestGroupId),
                         "tags" to listOf(mapOf("name" to tagName, "type" to "TOPIC")),
                         "visibility" to "PUBLIC",
+                        "links" to emptyList<Any>(),
                     )
                 )
                 contentType = APPLICATION_JSON

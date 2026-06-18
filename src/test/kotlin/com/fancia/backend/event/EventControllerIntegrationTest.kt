@@ -2,14 +2,11 @@ package com.fancia.backend.event
 
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.repository.EventRepository
-import com.fancia.backend.event.mapper.EventMapper
-import com.fancia.backend.shared.common.tag.core.entity.Tag
-import com.fancia.backend.shared.common.tag.core.enums.TagType
+import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import jakarta.persistence.EntityManager
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
@@ -37,10 +34,9 @@ class EventControllerIntegrationTest(
     private val wiremock: WireMockContainer,
     private val eventRepository: EventRepository,
     private val jsonMapper: JsonMapper,
-    private val eventMapper: EventMapper,
-    private val entityManager: EntityManager,
 ) : FunSpec({
     val testInterestGroupId = UUID.randomUUID()
+    val testUserId = UUID.randomUUID()
 
     beforeSpec {
         configureFor(
@@ -49,47 +45,39 @@ class EventControllerIntegrationTest(
         )
     }
 
-    fun persistTopicTag(name: String): Tag {
-        val tag = Tag(name = name, type = TagType.TOPIC)
-        entityManager.persist(tag)
-        entityManager.flush()
-        return tag
-    }
-
-    fun stubTopicTag(tag: Tag) {
+    fun stubCreateTag(name: String): UUID {
+        val tagId = UUID.randomUUID()
         stubFor(
-            get(urlPathEqualTo("/api/tags"))
-                .withQueryParam("search", equalTo(tag.name))
-                .withQueryParam("type", equalTo("TOPIC"))
+            post(urlPathEqualTo("/api/tags"))
                 .willReturn(
                     aResponse()
-                        .withStatus(200)
+                        .withStatus(201)
                         .withHeader("Content-Type", "application/json")
                         .withBody(
                             jsonMapper.writeValueAsString(
                                 mapOf(
                                     "content" to listOf(
                                         mapOf(
-                                            "id" to tag.id.toString(),
-                                            "name" to tag.name,
+                                            "id" to tagId.toString(),
+                                            "name" to name,
                                             "type" to "TOPIC",
                                         ),
                                     ),
                                     "totalElements" to 1,
                                     "totalPages" to 1,
-                                    "size" to 20,
+                                    "size" to 1,
                                     "number" to 0,
                                 ),
                             ),
                         ),
                 ),
         )
+        return tagId
     }
 
     test("should create a new event") {
-        val testUserId = UUID.randomUUID()
-        val goodTag = persistTopicTag("good")
-        stubTopicTag(goodTag)
+
+        stubCreateTag("good")
         val response = mockMvc
             .post("/api/events") {
                 with(jwt().jwt {
@@ -99,10 +87,11 @@ class EventControllerIntegrationTest(
                     "name" to "testEvent",
                     "description" to "string",
                     "startTime" to "2024-06-01T10:00:00",
-                    "duration" to "PT2H",
+                    "endTime" to "2024-06-01T12:00:00",
                     "interestGroups" to listOf(testInterestGroupId),
                     "tags" to listOf(mapOf("name" to "good", "type" to "TOPIC")),
                     "visibility" to "PUBLIC",
+                    "links" to emptyList<Any>(),
                 )
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
@@ -113,16 +102,18 @@ class EventControllerIntegrationTest(
                 status { isOk() }
                 jsonPath("$.name", `is`("testEvent"))
                 jsonPath("$.id", `is`(notNullValue()))
+                jsonPath("$.interestGroups[0]", `is`(testInterestGroupId.toString()))
             }
-        val createdEvent = response.toEvent(jsonMapper, eventMapper)
+        val createdEvent = response.toEvent(jsonMapper)
         val found = eventRepository.findByIdOrNull(createdEvent.id!!)
-        createdEvent shouldBe found
+        found?.id shouldBe createdEvent.id
     }
 
     test("should list events") {
         val event = eventRepository.findAll().first { it.name == "testEvent" }
+        val tagId = event.tags.first()
         mockMvc
-            .get("/api/events?tags=good&page=0&size=3") {
+            .get("/api/events?tagIds=$tagId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -137,7 +128,7 @@ class EventControllerIntegrationTest(
 
     test("should not list events because of wrong tag") {
         mockMvc
-            .get("/api/events?tags=bad&page=0&size=3") {
+            .get("/api/events?tagIds=${UUID.randomUUID()}&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -161,9 +152,8 @@ class EventControllerIntegrationTest(
     }
 
     test("should not list private events but allow direct access by id") {
-        val testUserId = UUID.randomUUID()
-        val secretTag = persistTopicTag("secret")
-        stubTopicTag(secretTag)
+
+        val secretTagId = stubCreateTag("secret")
         val createResponse = mockMvc
             .post("/api/events") {
                 with(jwt().jwt { it.claim("userId", testUserId) })
@@ -172,10 +162,11 @@ class EventControllerIntegrationTest(
                         "name" to "Secret Event",
                         "description" to "Invite only",
                         "startTime" to "2024-06-02T10:00:00",
-                        "duration" to "PT1H",
+                        "endTime" to "2024-06-02T11:00:00",
                         "interestGroups" to listOf(testInterestGroupId),
                         "tags" to listOf(mapOf("name" to "secret", "type" to "TOPIC")),
                         "visibility" to "PRIVATE",
+                        "links" to emptyList<Any>(),
                     )
                 )
                 contentType = APPLICATION_JSON
@@ -191,7 +182,7 @@ class EventControllerIntegrationTest(
         val createdPrivateEventId = jsonMapper.readTree(createResponse).get("id").asText()
 
         mockMvc
-            .get("/api/events?tags=secret&page=0&size=10") {
+            .get("/api/events?tagIds=$secretTagId&page=0&size=10") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -237,8 +228,10 @@ class EventControllerIntegrationTest(
     }
 
     test("should list events filtered by interest group id and tags") {
+        val event = eventRepository.findAll().first { it.name == "testEvent" }
+        val tagId = event.tags.first()
         mockMvc
-            .get("/api/events?interestGroup=$testInterestGroupId&tags=good&page=0&size=3") {
+            .get("/api/events?interestGroup=$testInterestGroupId&tagIds=$tagId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -251,7 +244,7 @@ class EventControllerIntegrationTest(
 
     test("should not list events when interest group id and tags do not match") {
         mockMvc
-            .get("/api/events?interestGroup=$testInterestGroupId&tags=bad&page=0&size=3") {
+            .get("/api/events?interestGroup=$testInterestGroupId&tagIds=${UUID.randomUUID()}&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -266,12 +259,11 @@ class EventControllerIntegrationTest(
     }
 })
 
-private fun ResultActionsDsl.toEvent(jsonMapper: JsonMapper, eventMapper: EventMapper): Event =
+private fun ResultActionsDsl.toEvent(jsonMapper: JsonMapper): Event =
     andReturn()
         .response
         .contentAsString
         .let {
-            jsonMapper.readValue(it, object : TypeReference<EventResponse>() {}).let(
-                eventMapper::toBean
-            )
+            jsonMapper.readValue(it, object : TypeReference<EventResponse>() {})
+                .toEntity()
         }

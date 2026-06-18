@@ -2,7 +2,6 @@ plugins {
     kotlin("jvm") version "2.2.21"
     kotlin("plugin.spring") version "2.2.21"
     kotlin("plugin.jpa") version "2.3.20"
-    kotlin("kapt") version "2.0.21"
     id("org.springframework.boot") version "4.0.3"
     id("io.spring.dependency-management") version "1.1.7"
 }
@@ -39,7 +38,6 @@ fun RepositoryHandler.codeArtifactRepo(repoName: String) {
 
 repositories {
     mavenCentral()
-    mavenLocal()
     maven { url = uri("https://repo.spring.io/snapshot") }
     codeArtifactRepo("fancia-backend-shared-common")
     codeArtifactRepo("fancia-backend-shared-event")
@@ -67,8 +65,6 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.postgresql:postgresql")
-    implementation("org.mapstruct:mapstruct:1.6.3")
-    kapt("org.mapstruct:mapstruct-processor:1.6.3")
     implementation("org.apache.commons:commons-lang3:3.18.0")
     implementation("commons-io:commons-io:2.20.0")
     implementation("software.amazon.awssdk:sts:2.42.4")

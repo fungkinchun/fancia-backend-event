@@ -8,7 +8,6 @@ import com.fancia.backend.shared.event.core.enums.EventLocationKind
 import com.fancia.backend.shared.event.core.exception.EventVenueIdRequiredException
 import com.fancia.backend.shared.venue.core.exception.VenueNotFoundException
 import org.springframework.stereotype.Component
-import java.util.*
 
 @Component
 class EventLocationResolver(

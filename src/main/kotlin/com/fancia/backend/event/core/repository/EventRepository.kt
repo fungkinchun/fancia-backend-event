@@ -15,32 +15,34 @@ interface EventRepository : JpaRepository<Event, UUID> {
         """
     SELECT e
     FROM Event e
-    WHERE (:interestGroupId IS NULL OR :interestGroupId MEMBER OF e.interestGroups)
-      AND (
-           e.visibility = com.fancia.backend.shared.event.core.enums.EventVisibility.PUBLIC
-           OR (
-               e.visibility = com.fancia.backend.shared.event.core.enums.EventVisibility.GROUP
-               AND :interestGroupId IS NOT NULL
-               AND :interestGroupId MEMBER OF e.interestGroups
-           )
-      )
-      AND (
-           (:name = '' AND :description = '' AND :tags = '')
+    WHERE (
+           (:name = '' AND :description = '')
            OR trgm_word_similarity(:name, e.name) = true
            OR trgm_word_similarity(:description, e.description) = true
-           OR trgm_word_similarity(:tags,
-              (SELECT LISTAGG(t.name, ',') WITHIN GROUP (ORDER BY t.name) FROM Tag t WHERE t.id IN elements(e.tags))
-           ) = true
       )
+      AND (:filterByTagIds = false OR EXISTS (SELECT tag FROM e.tags tag WHERE tag IN :tagIds))
     GROUP BY e
-"""
+""",
     )
-    fun findAll(
+    fun search(
         @Param("name") name: String,
         @Param("description") description: String,
-        @Param("tags") tags: String,
-        @Param("interestGroupId") interestGroupId: UUID?,
-        pageable: Pageable
+        @Param("filterByTagIds") filterByTagIds: Boolean,
+        @Param("tagIds") tagIds: Collection<UUID>,
+        pageable: Pageable,
+    ): Page<Event>
+
+    @Query(
+        """
+    SELECT DISTINCT e
+    FROM Event e
+    JOIN e.tags tag
+    WHERE tag IN :tagIds
+""",
+    )
+    fun findByTagIdIn(
+        @Param("tagIds") tagIds: Collection<UUID>,
+        pageable: Pageable,
     ): Page<Event>
 
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event?
@@ -54,23 +56,6 @@ interface EventRepository : JpaRepository<Event, UUID> {
             WHERE e.deleted = false
               AND e.latitude IS NOT NULL
               AND e.longitude IS NOT NULL
-              AND (
-                (:interestGroupId IS NULL AND e.visibility = 'PUBLIC')
-                OR (
-                  :interestGroupId IS NOT NULL
-                  AND (
-                    e.visibility = 'PUBLIC'
-                    OR (
-                      e.visibility = 'GROUP'
-                      AND EXISTS (
-                        SELECT 1 FROM event_interest_groups eig
-                        WHERE eig.event_id = e.id
-                          AND eig.event_interest_groups = :interestGroupId
-                      )
-                    )
-                  )
-                )
-              )
               AND ST_DWithin(
                 geography(ST_SetSRID(ST_MakePoint(e.longitude, e.latitude), 4326)),
                 geography(ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)),
@@ -86,23 +71,6 @@ interface EventRepository : JpaRepository<Event, UUID> {
             WHERE e.deleted = false
               AND e.latitude IS NOT NULL
               AND e.longitude IS NOT NULL
-              AND (
-                (:interestGroupId IS NULL AND e.visibility = 'PUBLIC')
-                OR (
-                  :interestGroupId IS NOT NULL
-                  AND (
-                    e.visibility = 'PUBLIC'
-                    OR (
-                      e.visibility = 'GROUP'
-                      AND EXISTS (
-                        SELECT 1 FROM event_interest_groups eig
-                        WHERE eig.event_id = e.id
-                          AND eig.event_interest_groups = :interestGroupId
-                      )
-                    )
-                  )
-                )
-              )
               AND ST_DWithin(
                 geography(ST_SetSRID(ST_MakePoint(e.longitude, e.latitude), 4326)),
                 geography(ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)),
@@ -115,7 +83,6 @@ interface EventRepository : JpaRepository<Event, UUID> {
         @Param("lat") lat: Double,
         @Param("lng") lng: Double,
         @Param("radiusMeters") radiusMeters: Double,
-        @Param("interestGroupId") interestGroupId: UUID?,
         pageable: Pageable,
     ): Page<Event>
 }
