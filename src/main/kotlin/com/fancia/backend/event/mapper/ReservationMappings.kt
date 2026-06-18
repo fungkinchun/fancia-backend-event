@@ -8,30 +8,30 @@ import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
 
 fun Reservation.toDto(): ReservationResponse =
     ReservationResponse(
-        eventId = id?.eventId,
-        userId = id?.userId,
-        status = status,
+        eventId = this@toDto.id?.eventId,
+        userId = this@toDto.id?.userId,
+        status = this@toDto.status,
     )
 
 fun CreateReservationRequest.toEntity(): Reservation =
     Reservation().apply {
-        guests = guests
-        payload = payload
+        guests = this@toEntity.guests
+        payload = this@toEntity.payload
     }
 
 fun UpdateReservationRequest.toEntity(reservation: Reservation): Reservation {
-    reservation.guests = guests
-    reservation.payload = payload
-    reservation.status = status
+    reservation.guests = this@toEntity.guests
+    reservation.payload = this@toEntity.payload
+    reservation.status = this@toEntity.status
     return reservation
 }
 
 fun ReservationResponse.toEntity(): Reservation =
     Reservation(
         id = ReservationId(
-            eventId = eventId,
-            userId = userId,
+            eventId = this@toEntity.eventId,
+            userId = this@toEntity.userId,
         ),
     ).apply {
-        status = status
+        status = this@toEntity.status
     }

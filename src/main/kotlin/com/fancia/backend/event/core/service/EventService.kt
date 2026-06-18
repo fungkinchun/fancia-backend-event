@@ -8,7 +8,6 @@ import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
-import com.fancia.backend.shared.common.social.core.entity.Link
 import com.fancia.backend.shared.common.tag.core.dto.CreateTagsRequest
 import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
@@ -54,10 +53,6 @@ class EventService(
             it.createdBy = currentUserId
             it.visibility = visibility
             applyTags(it.tags, request.tags)
-            it.links.clear()
-            it.links.addAll(request.links.map { link -> Link(type = link.type, url = link.url) })
-            it.interestGroups.clear()
-            it.interestGroups.addAll(request.interestGroups)
             eventLocationResolver.apply(it, request.location)
             val event = eventRepository.save(it).toDto()
             event.id?.let { eventId ->
@@ -86,8 +81,6 @@ class EventService(
             request.toEntity(event).apply {
                 this.visibility = visibility
                 applyTags(this.tags, request.tags)
-                this.links.clear()
-                this.links.addAll(request.links.map { link -> Link(type = link.type, url = link.url) })
                 eventLocationResolver.apply(this, request.location)
             }
         ).toDto()

@@ -73,4 +73,21 @@ object EventLocationSupport {
             country = event.country,
         )
     }
+
+    fun applyFromDto(event: Event, location: EventLocationDto?) {
+        if (location == null) {
+            clear(event)
+            return
+        }
+        event.locationKind = location.kind
+        event.venueId = location.venueId
+        event.locationLabel = location.label
+        event.placeId = location.placeId
+        event.latitude = location.latitude
+        event.longitude = location.longitude
+        event.addressLine = location.addressLine
+        event.city = location.city
+        event.postcode = location.postcode
+        event.country = location.country
+    }
 }

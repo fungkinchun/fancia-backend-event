@@ -3,6 +3,7 @@ package com.fancia.backend.event.mapper
 import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.entity.EventParticipant
 import com.fancia.backend.event.core.support.EventLocationSupport
+import com.fancia.backend.shared.common.social.core.dto.LinkItem
 import com.fancia.backend.shared.common.social.core.dto.LinkResponse
 import com.fancia.backend.shared.common.social.core.entity.Link
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
@@ -32,14 +33,16 @@ fun CreateEventRequest.toEntity(): Event =
         description = this@toEntity.description
         startTime = this@toEntity.startTime
         endTime = this@toEntity.endTime
-        interestGroups = interestGroups.toMutableSet()
-        visibility = this@toEntity.visibility!!
+        interestGroups = this@toEntity.interestGroups.toMutableSet()
+        links = this@toEntity.links.map { it.toEntity() }.toMutableSet()
     }
 
 fun UpdateEventRequest.toEntity(event: Event): Event {
-    event.description = description
-    event.startTime = startTime
-    event.endTime = endTime
+    event.description = this@toEntity.description
+    event.startTime = this@toEntity.startTime
+    event.endTime = this@toEntity.endTime
+    event.links.clear()
+    event.links.addAll(this@toEntity.links.map { it.toEntity() })
     return event
 }
 
@@ -48,21 +51,28 @@ fun EventResponse.toEntity(): Event =
         id = this@toEntity.id
         name = this@toEntity.name
         description = this@toEntity.description
-        interestGroups = interestGroups.toMutableSet()
+        interestGroups = this@toEntity.interestGroups.toMutableSet()
         createdBy = this@toEntity.createdBy
         createdAt = this@toEntity.createdAt
         startTime = this@toEntity.startTime
         endTime = this@toEntity.endTime
-        tags = tags.toMutableSet()
+        tags = this@toEntity.tags.toMutableSet()
         visibility = this@toEntity.visibility
-        links = links.map { Link(type = it.type, url = it.url) }.toMutableSet()
+        links = this@toEntity.links.map { it.toEntity() }.toMutableSet()
+        EventLocationSupport.applyFromDto(this, this@toEntity.location)
     }
 
 fun EventParticipant.toDto(): EventParticipantResponse =
     EventParticipantResponse(
-        userId = id.userId,
-        role = role,
+        userId = this@toDto.id.userId,
+        role = this@toDto.role,
     )
 
 private fun Link.toDto(): LinkResponse =
-    LinkResponse(type = type, url = url)
+    LinkResponse(type = this@toDto.type, url = this@toDto.url)
+
+private fun LinkItem.toEntity(): Link =
+    Link(type = this@toEntity.type, url = this@toEntity.url)
+
+private fun LinkResponse.toEntity(): Link =
+    Link(type = this@toEntity.type, url = this@toEntity.url)
