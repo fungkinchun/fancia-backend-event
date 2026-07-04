@@ -6,10 +6,9 @@ import com.fancia.backend.event.core.support.EventLocationSupport
 import com.fancia.backend.shared.common.social.core.dto.LinkItem
 import com.fancia.backend.shared.common.social.core.dto.LinkResponse
 import com.fancia.backend.shared.common.social.core.entity.Link
-import com.fancia.backend.shared.event.core.dto.CreateEventRequest
-import com.fancia.backend.shared.event.core.dto.EventParticipantResponse
-import com.fancia.backend.shared.event.core.dto.EventResponse
-import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
+import com.fancia.backend.shared.event.core.dto.*
+import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
+import com.fancia.backend.shared.event.core.model.RecurrenceDaysMask
 
 fun Event.toDto(): EventResponse =
     EventResponse(
@@ -25,6 +24,7 @@ fun Event.toDto(): EventResponse =
         visibility = this@toDto.visibility,
         location = EventLocationSupport.toDto(this),
         links = this@toDto.links.map { it.toDto() }.toSet(),
+        recurrence = toRecurrenceDto(this@toDto),
     )
 
 fun CreateEventRequest.toEntity(): Event =
@@ -76,3 +76,11 @@ private fun LinkItem.toEntity(): Link =
 
 private fun LinkResponse.toEntity(): Link =
     Link(type = this@toEntity.type, url = this@toEntity.url)
+
+private fun toRecurrenceDto(event: Event): EventRecurrenceDto? {
+    if (event.recurrenceFrequency == RecurrenceFrequency.NONE) return null
+    return EventRecurrenceDto(
+        frequency = event.recurrenceFrequency,
+        daysOfWeek = RecurrenceDaysMask(event.recurrenceDaysMask).toDayOfWeekSet(),
+    )
+}

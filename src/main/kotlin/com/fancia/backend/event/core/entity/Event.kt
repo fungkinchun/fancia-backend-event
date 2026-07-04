@@ -4,6 +4,7 @@ import com.fancia.backend.shared.common.core.entity.AbstractEntity
 import com.fancia.backend.shared.common.social.core.entity.Link
 import com.fancia.backend.shared.event.core.enums.EventLocationKind
 import com.fancia.backend.shared.event.core.enums.EventVisibility
+import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import jakarta.persistence.*
 import java.time.LocalDateTime
 import java.util.*
@@ -46,7 +47,6 @@ class Event : AbstractEntity() {
     @Enumerated(EnumType.STRING)
     @Column(length = 32)
     var locationKind: EventLocationKind? = null
-
     var venueId: UUID? = null
 
     @Column(length = 500)
@@ -54,9 +54,7 @@ class Event : AbstractEntity() {
 
     @Column(length = 255)
     var placeId: String? = null
-
     var latitude: Double? = null
-
     var longitude: Double? = null
 
     @Column(length = 500)
@@ -70,4 +68,11 @@ class Event : AbstractEntity() {
 
     @Column(length = 100)
     var country: String? = null
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recurrence_frequency", length = 32, nullable = false)
+    var recurrenceFrequency: RecurrenceFrequency = RecurrenceFrequency.NONE
+
+    @Column(name = "recurrence_days_mask", nullable = false)
+    var recurrenceDaysMask: Int = 0
 }

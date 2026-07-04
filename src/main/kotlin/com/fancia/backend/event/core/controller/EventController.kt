@@ -72,12 +72,12 @@ class EventController(
     @GetMapping
     @Operation(
         summary = "List events",
-        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link. Supports proximity search when lat/lng are provided."
+        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link. Supports proximity search when lat/lng are provided. With match=true, returns upcoming events ranked by shared tagIds. With schedule=true, filters by location and excludes events that conflict with the authenticated user's upcoming schedule.",
     )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "List of events returned"),
-        ]
+        ],
     )
     fun listEvents(
         @RequestParam(required = false)
@@ -98,12 +98,36 @@ class EventController(
         @Parameter(description = "Longitude for proximity search")
         lng: Double?,
         @RequestParam(required = false)
-        @Parameter(description = "Search radius in kilometres (required with lat/lng for proximity search)")
-        radiusKm: Double? = null,
+        @Parameter(description = "Search radius in kilometres for proximity search")
+        radiusKm: Double = 5.0,
+        @RequestParam(required = false)
+        @Parameter(description = "Location label for schedule-based matching when lat/lng are not provided")
+        locationLabel: String?,
+        @RequestParam(name = "match", defaultValue = "false")
+        @Parameter(description = "When true, match upcoming events by the supplied tagIds")
+        match: Boolean,
+        @RequestParam(name = "schedule", defaultValue = "false")
+        @Parameter(description = "When true, match nearby events that fit the authenticated user's free schedule")
+        schedule: Boolean,
+        @AuthenticationPrincipal jwt: Jwt?,
         @PageableDefault(size = 20)
-        pageable: Pageable
+        pageable: Pageable,
     ): ResponseEntity<Page<EventResponse>> {
-        val groups = eventService.findAll(name, description, tagIds, interestGroup, lat, lng, radiusKm, pageable)
-        return ResponseEntity.ok(groups)
+        return ResponseEntity.ok(
+            eventService.findAll(
+                name,
+                description,
+                tagIds,
+                interestGroup,
+                lat,
+                lng,
+                radiusKm,
+                locationLabel,
+                match,
+                schedule,
+                jwt,
+                pageable,
+            ),
+        )
     }
 }

@@ -2,9 +2,11 @@ package com.fancia.backend.event.core.controller
 
 import com.fancia.backend.event.config.ApplicationProperties
 import com.fancia.backend.shared.common.core.exception.DomainException
+import com.fasterxml.jackson.databind.JsonMappingException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -49,6 +51,23 @@ class ValidationHandler(
             instance = URI.create((request as ServletWebRequest).request.requestURI)
         }
         log.warn("Domain error: ${ex.errorCode} - ${ex.message}")
+        return problem
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleUnreadable(ex: HttpMessageNotReadableException): ProblemDetail {
+        val path = (ex.mostSpecificCause as? JsonMappingException)
+            ?.path
+            ?.joinToString(".") { it.fieldName ?: "[${it.index}]" }
+            ?: "unknown"
+        val problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.BAD_REQUEST,
+            path
+        ).apply {
+            applicationProperties.baseUrl?.let { type = URI.create(it) }
+            title = "Invalid Request Body"
+            setProperty("errorCode", "INVALID_REQUEST_BODY")
+        }
         return problem
     }
 }

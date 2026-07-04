@@ -51,6 +51,36 @@ interface EventRepository : JpaRepository<Event, UUID> {
     fun findByTagId(@Param("tagId") tagId: UUID): List<Event>
 
     @Query(
+        """
+        SELECT DISTINCT e
+        FROM Event e
+        JOIN e.participants p
+        WHERE p.id.userId = :userId
+          AND e.startTime >= :from
+        """,
+    )
+    fun findUpcomingForParticipant(
+        @Param("userId") userId: UUID,
+        @Param("from") from: java.time.LocalDateTime,
+    ): List<Event>
+
+    @Query(
+        """
+        SELECT DISTINCT e
+        FROM Event e
+        JOIN e.reservations r
+        WHERE r.id.userId = :userId
+          AND r.status IN :statuses
+          AND e.startTime >= :from
+        """,
+    )
+    fun findUpcomingForReservation(
+        @Param("userId") userId: UUID,
+        @Param("from") from: java.time.LocalDateTime,
+        @Param("statuses") statuses: Collection<com.fancia.backend.shared.event.core.enums.ReservationStatus>,
+    ): List<Event>
+
+    @Query(
         value = """
             SELECT e.* FROM events e
             WHERE e.deleted = false

@@ -15,8 +15,6 @@ fun Reservation.toDto(): ReservationResponse =
 
 fun CreateReservationRequest.toEntity(): Reservation =
     Reservation().apply {
-        guests = this@toEntity.guests
-        payload = this@toEntity.payload
     }
 
 fun UpdateReservationRequest.toEntity(reservation: Reservation): Reservation {
@@ -33,5 +31,4 @@ fun ReservationResponse.toEntity(): Reservation =
             userId = this@toEntity.userId,
         ),
     ).apply {
-        status = this@toEntity.status
     }

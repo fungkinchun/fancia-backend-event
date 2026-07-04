@@ -4,14 +4,18 @@ import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.event.core.dto.EventResponse
+import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.data.domain.Page
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -37,6 +41,7 @@ class EventControllerIntegrationTest(
 ) : FunSpec({
     val testInterestGroupId = UUID.randomUUID()
     val testUserId = UUID.randomUUID()
+    val otherUserId = UUID.randomUUID()
 
     beforeSpec {
         configureFor(
@@ -73,6 +78,74 @@ class EventControllerIntegrationTest(
                 ),
         )
         return tagId
+    }
+
+    fun jwtFor(userId: UUID) = jwt().jwt { it.claim("userId", userId) }
+
+    fun stubTag(tagId: UUID, name: String) {
+        stubFor(
+            post(urlPathEqualTo("/api/tags"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(201)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            jsonMapper.writeValueAsString(
+                                mapOf(
+                                    "content" to listOf(
+                                        mapOf(
+                                            "id" to tagId.toString(),
+                                            "name" to name,
+                                            "type" to "TOPIC",
+                                        ),
+                                    ),
+                                    "totalElements" to 1,
+                                    "totalPages" to 1,
+                                    "size" to 1,
+                                    "number" to 0,
+                                ),
+                            ),
+                        ),
+                ),
+        )
+    }
+
+    fun createFutureEvent(
+        createdBy: UUID,
+        name: String,
+        startTime: String,
+        endTime: String,
+        tagName: String,
+        tagId: UUID,
+        visibility: String = "PUBLIC",
+        location: Map<String, Any?>? = null,
+    ): EventResponse {
+        stubTag(tagId, tagName)
+        val requestBody = buildMap {
+            put("name", name)
+            put("description", "Personalized list test event")
+            put("startTime", startTime)
+            put("endTime", endTime)
+            put("interestGroups", listOf(testInterestGroupId))
+            put("tags", listOf(mapOf("name" to tagName, "type" to "TOPIC")))
+            put("visibility", visibility)
+            put("links", emptyList<Any>())
+            location?.let { put("location", it) }
+        }
+        return mockMvc
+            .post("/api/events") {
+                with(jwtFor(createdBy))
+                content = jsonMapper.writeValueAsString(requestBody)
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect { status { isOk() } }
+            .toEventResponse(jsonMapper)
+    }
+
+    fun preparePersonalizedTest() {
+        reset()
+        eventRepository.deleteAll()
     }
 
     test("should create a new event") {
@@ -254,6 +327,214 @@ class EventControllerIntegrationTest(
             }
     }
 
+    test("should match events by user interests when match=true") {
+        preparePersonalizedTest()
+        val hikingTagId = UUID.randomUUID()
+        val cookingTagId = UUID.randomUUID()
+
+        val matchedEvent = createFutureEvent(
+            createdBy = otherUserId,
+            name = "Hiking Meetup",
+            startTime = "2030-06-01T10:00:00",
+            endTime = "2030-06-01T12:00:00",
+            tagName = "hiking",
+            tagId = hikingTagId,
+        )
+        createFutureEvent(
+            createdBy = otherUserId,
+            name = "Cooking Class",
+            startTime = "2030-06-02T10:00:00",
+            endTime = "2030-06-02T12:00:00",
+            tagName = "cooking",
+            tagId = cookingTagId,
+        )
+
+        val response = mockMvc
+            .get("/api/events?match=true&tagIds=$hikingTagId") {
+                with(jwtFor(testUserId))
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(1))
+                jsonPath("$.content[0].id", `is`(matchedEvent.id.toString()))
+                jsonPath("$.content[0].name", `is`("Hiking Meetup"))
+            }
+            .toEventPage(jsonMapper)
+
+        response.content.single().id shouldBe matchedEvent.id
+    }
+
+    test("should exclude private events when match=true") {
+        preparePersonalizedTest()
+        val secretTagId = UUID.randomUUID()
+
+        createFutureEvent(
+            createdBy = otherUserId,
+            name = "Secret Event",
+            startTime = "2030-06-01T10:00:00",
+            endTime = "2030-06-01T12:00:00",
+            tagName = "secret",
+            tagId = secretTagId,
+            visibility = "PRIVATE",
+        )
+
+        mockMvc
+            .get("/api/events?match=true&tagIds=$secretTagId") {
+                with(jwtFor(testUserId))
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(0))
+            }
+    }
+
+    test("should match nearby events by location label when schedule=true") {
+        preparePersonalizedTest()
+        val socialTagId = UUID.randomUUID()
+
+        val londonEvent = createFutureEvent(
+            createdBy = otherUserId,
+            name = "London Social",
+            startTime = "2030-06-01T14:00:00",
+            endTime = "2030-06-01T16:00:00",
+            tagName = "social",
+            tagId = socialTagId,
+            location = mapOf(
+                "kind" to "ADDRESS",
+                "city" to "London",
+                "country" to "UK",
+            ),
+        )
+        createFutureEvent(
+            createdBy = otherUserId,
+            name = "Paris Social",
+            startTime = "2030-06-01T14:00:00",
+            endTime = "2030-06-01T16:00:00",
+            tagName = "social",
+            tagId = socialTagId,
+            location = mapOf(
+                "kind" to "ADDRESS",
+                "city" to "Paris",
+                "country" to "France",
+            ),
+        )
+
+        val response = mockMvc
+            .get("/api/events?schedule=true&locationLabel=London") {
+                with(jwtFor(testUserId))
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(1))
+                jsonPath("$.content[0].id", `is`(londonEvent.id.toString()))
+            }
+            .toEventPage(jsonMapper)
+
+        response.content.map { it.id } shouldContain londonEvent.id
+    }
+
+    test("should create recurring event as a single row") {
+        preparePersonalizedTest()
+        stubCreateTag("yoga")
+
+        val createResponse = mockMvc
+            .post("/api/events") {
+                with(jwtFor(testUserId))
+                content = jsonMapper.writeValueAsString(
+                    mapOf(
+                        "name" to "Weekly Yoga",
+                        "description" to "Recurring yoga class",
+                        "startTime" to "2030-06-03T10:00:00",
+                        "endTime" to "2030-06-03T11:00:00",
+                        "interestGroups" to listOf(testInterestGroupId),
+                        "tags" to listOf(mapOf("name" to "yoga", "type" to "TOPIC")),
+                        "visibility" to "PUBLIC",
+                        "links" to emptyList<Any>(),
+                        "recurrence" to mapOf(
+                            "frequency" to "WEEKLY",
+                            "daysOfWeek" to listOf("MONDAY", "FRIDAY"),
+                        ),
+                    ),
+                )
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name", `is`("Weekly Yoga"))
+                jsonPath("$.recurrence.frequency", `is`("WEEKLY"))
+            }
+            .toEventResponse(jsonMapper)
+
+        eventRepository.findAll().size shouldBe 1
+        eventRepository.findByIdOrNull(createResponse.id!!)?.recurrenceFrequency shouldBe RecurrenceFrequency.WEEKLY
+    }
+
+    test("should exclude schedule conflicts when schedule=true") {
+        preparePersonalizedTest()
+        val busyTagId = UUID.randomUUID()
+        val conflictTagId = UUID.randomUUID()
+        val freeTagId = UUID.randomUUID()
+
+        createFutureEvent(
+            createdBy = testUserId,
+            name = "Busy Event",
+            startTime = "2030-06-01T10:00:00",
+            endTime = "2030-06-01T12:00:00",
+            tagName = "busy",
+            tagId = busyTagId,
+            location = mapOf(
+                "kind" to "ADDRESS",
+                "city" to "London",
+                "country" to "UK",
+            ),
+        )
+        val conflictingEvent = createFutureEvent(
+            createdBy = otherUserId,
+            name = "Conflicting Event",
+            startTime = "2030-06-01T11:00:00",
+            endTime = "2030-06-01T13:00:00",
+            tagName = "conflict",
+            tagId = conflictTagId,
+            location = mapOf(
+                "kind" to "ADDRESS",
+                "city" to "London",
+                "country" to "UK",
+            ),
+        )
+        val freeEvent = createFutureEvent(
+            createdBy = otherUserId,
+            name = "Free Event",
+            startTime = "2030-06-01T14:00:00",
+            endTime = "2030-06-01T16:00:00",
+            tagName = "free",
+            tagId = freeTagId,
+            location = mapOf(
+                "kind" to "ADDRESS",
+                "city" to "London",
+                "country" to "UK",
+            ),
+        )
+
+        val response = mockMvc
+            .get("/api/events?schedule=true&locationLabel=London") {
+                with(jwtFor(testUserId))
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(1))
+                jsonPath("$.content[0].id", `is`(freeEvent.id.toString()))
+            }
+            .toEventPage(jsonMapper)
+
+        response.content.map { it.id } shouldContain freeEvent.id
+        response.content.map { it.id } shouldNotContain conflictingEvent.id
+    }
+
     afterSpec {
         eventRepository.deleteAll()
     }
@@ -267,3 +548,15 @@ private fun ResultActionsDsl.toEvent(jsonMapper: JsonMapper): Event =
             jsonMapper.readValue(it, object : TypeReference<EventResponse>() {})
                 .toEntity()
         }
+
+private fun ResultActionsDsl.toEventResponse(jsonMapper: JsonMapper): EventResponse =
+    andReturn()
+        .response
+        .contentAsString
+        .let { jsonMapper.readValue(it, object : TypeReference<EventResponse>() {}) }
+
+private fun ResultActionsDsl.toEventPage(jsonMapper: JsonMapper): Page<EventResponse> =
+    andReturn()
+        .response
+        .contentAsString
+        .let { jsonMapper.readValue(it, object : TypeReference<Page<EventResponse>>() {}) }

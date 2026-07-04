@@ -27,6 +27,7 @@ class ReservationService(
     private val eventRepository: EventRepository,
     private val eventParticipantRepository: EventParticipantRepository,
     private val reservationRepository: ReservationRepository,
+    private val eventUserTagSyncService: EventUserTagSyncService,
 ) {
     @Transactional
     fun create(eventId: UUID, request: @Valid CreateReservationRequest, jwt: Jwt): ReservationResponse {
@@ -43,7 +44,9 @@ class ReservationService(
             eventId = event.id!!,
             currentUserId
         )
-        return reservationRepository.save(reservation).toDto()
+        val saved = reservationRepository.save(reservation)
+        eventUserTagSyncService.syncEventTagsOnJoin(currentUserId, event)
+        return saved.toDto()
     }
 
     @Transactional
