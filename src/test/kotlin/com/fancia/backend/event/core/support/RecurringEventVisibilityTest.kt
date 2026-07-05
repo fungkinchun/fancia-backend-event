@@ -109,6 +109,18 @@ class RecurringEventVisibilityTest : FunSpec({
         RecurringEventVisibility.resolveMonthlyDay(31, YearMonth.of(2028, 2)) shouldBe 29
     }
 
+    test("one-time event ignores recurrence pause timestamp") {
+        val anchorStart = LocalDateTime.of(2030, 6, 10, 10, 0)
+        val event = Event().apply {
+            startTime = anchorStart
+            recurrenceFrequency = RecurrenceFrequency.NONE
+            recurrencePausedUntil = LocalDateTime.of(2030, 6, 10, 0, 0)
+        }
+        val now = LocalDateTime.of(2030, 6, 5, 9, 0)
+
+        RecurringEventVisibility.isListable(event, now) shouldBe true
+    }
+
     test("recurring event is not listable while pause is active") {
         val anchorStart = LocalDateTime.of(2030, 6, 3, 10, 0)
         val event = Event().apply {

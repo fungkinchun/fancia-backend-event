@@ -82,7 +82,11 @@ class EventService(
                 this.visibility = visibility
                 applyTags(this.tags, request.tags)
                 eventLocationResolver.apply(this, request.location)
-                applyRecurrencePause(this, request.recurrencePausedUntil)
+                if (this.recurrenceFrequency != RecurrenceFrequency.NONE) {
+                    applyRecurrencePause(this, request.recurrencePausedUntil)
+                } else {
+                    this.recurrencePausedUntil = null
+                }
             }
         ).toDto()
     }
@@ -130,21 +134,23 @@ class EventService(
 
         if (latitude != null && longitude != null) {
             val radiusMeters = radiusKm * 1000
-            return filterDiscoverable(
-                eventRepository.findNearby(latitude, longitude, radiusMeters, pageable),
+            return paginateDiscoverable(
+                eventRepository.findNearby(latitude, longitude, radiusMeters, browseFetchPageable(pageable)).content,
                 interestGroupId,
+                pageable,
             ).map { it.toDto() }
         }
         val trimmedName = name?.trim().orEmpty()
         val trimmedDescription = description?.trim().orEmpty()
         val hasText = trimmedName.isNotEmpty() || trimmedDescription.isNotEmpty()
         val hasTagIds = !tagIds.isNullOrEmpty()
+        val fetchPageable = browseFetchPageable(pageable)
         val events = when {
             !hasText && !hasTagIds ->
-                eventRepository.findAll(pageable)
+                eventRepository.findAll(fetchPageable)
 
             !hasText && hasTagIds ->
-                eventRepository.findByTagIdIn(tagIds, pageable)
+                eventRepository.findByTagIdIn(tagIds, fetchPageable)
 
             else ->
                 eventRepository.search(
@@ -152,10 +158,29 @@ class EventService(
                     trimmedDescription,
                     hasTagIds,
                     tagIds.orEmpty(),
-                    pageable,
+                    fetchPageable,
                 )
         }
-        return filterDiscoverable(events, interestGroupId).map { it.toDto() }
+        return paginateDiscoverable(events.content, interestGroupId, pageable).map { it.toDto() }
+    }
+
+    private fun browseFetchPageable(pageable: Pageable): Pageable {
+        return PageRequest.of(0, maxOf(pageable.pageSize * 10, 200))
+    }
+
+    private fun paginateDiscoverable(
+        candidates: List<Event>,
+        interestGroupId: UUID?,
+        pageable: Pageable,
+    ): Page<Event> {
+        val now = LocalDateTime.now()
+        val filtered = candidates.filter {
+            isDiscoverable(it, interestGroupId) && isVisibleInBrowseList(it, now)
+        }
+        val paged = filtered
+            .drop(pageable.offset.toInt())
+            .take(pageable.pageSize)
+        return PageImpl(paged, pageable, filtered.size.toLong())
     }
 
     private fun findPersonalized(
@@ -325,14 +350,6 @@ class EventService(
             EventVisibility.PUBLIC ->
                 interestGroupId == null || event.interestGroups.contains(interestGroupId)
         }
-    }
-
-    private fun filterDiscoverable(page: Page<Event>, interestGroupId: UUID?): Page<Event> {
-        val now = LocalDateTime.now()
-        val filtered = page.content.filter {
-            isDiscoverable(it, interestGroupId) && isVisibleInBrowseList(it, now)
-        }
-        return PageImpl(filtered, page.pageable, filtered.size.toLong())
     }
 
     private fun isVisibleInBrowseList(event: Event, now: LocalDateTime): Boolean {

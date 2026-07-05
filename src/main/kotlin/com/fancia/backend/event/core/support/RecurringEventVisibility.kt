@@ -79,6 +79,7 @@ object RecurringEventVisibility {
     }
 
     private fun isPauseActive(event: Event, now: LocalDateTime): Boolean {
+        if (event.recurrenceFrequency == RecurrenceFrequency.NONE) return false
         val pausedUntil = event.recurrencePausedUntil ?: return false
         return now.isBefore(pausedUntil)
     }
