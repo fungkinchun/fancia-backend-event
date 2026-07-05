@@ -75,4 +75,7 @@ class Event : AbstractEntity() {
 
     @Column(name = "recurrence_days_mask", nullable = false)
     var recurrenceDaysMask: Int = 0
+
+    @Column(name = "recurrence_paused_until")
+    var recurrencePausedUntil: LocalDateTime? = null
 }

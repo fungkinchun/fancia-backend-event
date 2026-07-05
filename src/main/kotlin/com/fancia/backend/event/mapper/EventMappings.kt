@@ -82,5 +82,6 @@ private fun toRecurrenceDto(event: Event): EventRecurrenceDto? {
     return EventRecurrenceDto(
         frequency = event.recurrenceFrequency,
         daysOfWeek = RecurrenceDaysMask(event.recurrenceDaysMask).toDayOfWeekSet(),
+        pausedUntil = event.recurrencePausedUntil,
     )
 }

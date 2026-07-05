@@ -25,9 +25,22 @@ object RecurringEventVisibility {
                     throw WeeklyRecurrenceRequiresDaysOfWeekException()
                 }
         }
+        recurrence.pausedUntil?.let { pausedUntil ->
+            if (recurrence.frequency == RecurrenceFrequency.NONE) {
+                throw IllegalArgumentException("pausedUntil is only valid for recurring events")
+            }
+        }
+    }
+
+    fun validatePause(event: Event, pausedUntil: LocalDateTime?) {
+        if (pausedUntil == null) return
+        if (event.recurrenceFrequency == RecurrenceFrequency.NONE) {
+            throw IllegalArgumentException("Cannot pause a one-time event")
+        }
     }
 
     fun isListable(event: Event, now: LocalDateTime): Boolean {
+        if (isPauseActive(event, now)) return false
         val anchorStart = event.startTime ?: return false
         return when (event.recurrenceFrequency) {
             RecurrenceFrequency.NONE -> !anchorStart.isBefore(now)
@@ -65,6 +78,11 @@ object RecurringEventVisibility {
         return start.plus(Duration.between(anchorStart, anchorEnd))
     }
 
+    private fun isPauseActive(event: Event, now: LocalDateTime): Boolean {
+        val pausedUntil = event.recurrencePausedUntil ?: return false
+        return now.isBefore(pausedUntil)
+    }
+
     internal fun isDailyListable(anchorStart: LocalDateTime, now: LocalDateTime): Boolean {
         val todayStart = now.toLocalDate().atTime(anchorStart.toLocalTime())
         return !todayStart.isBefore(now)
@@ -80,7 +98,10 @@ object RecurringEventVisibility {
         if (daysMask.contains(today)) {
             return isDailyListable(anchorStart, now)
         }
-        return daysMask.toDayOfWeekSet().any { it.value > today.value }
+        if (daysMask.toDayOfWeekSet().any { it.value > today.value }) {
+            return true
+        }
+        return true
     }
 
     internal fun isMonthlyListable(anchorStart: LocalDateTime, now: LocalDateTime): Boolean {
@@ -90,7 +111,11 @@ object RecurringEventVisibility {
         if (todayDay == occurrenceDay) {
             return isDailyListable(anchorStart, now)
         }
-        return occurrenceDay > todayDay
+        if (occurrenceDay > todayDay) {
+            return true
+        }
+        // Occurrence day already passed this month — still repeats next month.
+        return true
     }
 
     internal fun resolveMonthlyDay(anchorDayOfMonth: Int, month: YearMonth): Int {
@@ -107,14 +132,27 @@ object RecurringEventVisibility {
             return now.toLocalDate().atTime(anchorStart.toLocalTime())
         }
         val nextDay =
-            daysMask.toDayOfWeekSet().filter { it.value > today.value }.minByOrNull { it.value } ?: return null
-        val daysUntil = nextDay.value - today.value
+            daysMask.toDayOfWeekSet().filter { it.value > today.value }.minByOrNull { it.value }
+                ?: daysMask.toDayOfWeekSet().minByOrNull { it.value }
+                ?: return null
+        val daysUntil =
+            if (nextDay.value > today.value) {
+                nextDay.value - today.value
+            } else {
+                7 - today.value + nextDay.value
+            }
         return now.toLocalDate().plusDays(daysUntil.toLong()).atTime(anchorStart.toLocalTime())
     }
 
     private fun nextMonthlyOccurrenceStart(anchorStart: LocalDateTime, now: LocalDateTime): LocalDateTime {
         val month = YearMonth.from(now)
         val day = resolveMonthlyDay(anchorStart.dayOfMonth, month)
-        return LocalDate.of(month.year, month.month, day).atTime(anchorStart.toLocalTime())
+        val candidate = LocalDate.of(month.year, month.month, day).atTime(anchorStart.toLocalTime())
+        if (!candidate.isBefore(now)) {
+            return candidate
+        }
+        val nextMonth = month.plusMonths(1)
+        val nextDay = resolveMonthlyDay(anchorStart.dayOfMonth, nextMonth)
+        return LocalDate.of(nextMonth.year, nextMonth.month, nextDay).atTime(anchorStart.toLocalTime())
     }
 }

@@ -1,5 +1,6 @@
 package com.fancia.backend.event.core.support
 
+import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.shared.event.core.dto.EventRecurrenceDto
 import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import com.fancia.backend.shared.event.core.exception.RecurrenceDaysOfWeekNotSupportedException
@@ -69,7 +70,7 @@ class RecurringEventVisibilityTest : FunSpec({
         RecurringEventVisibility.isDailyListable(anchorStart, LocalDateTime.of(2030, 5, 25, 10, 1)) shouldBe false
     }
 
-    test("weekly event is filtered when recurrence day already passed this week") {
+    test("weekly event stays listable after this week's recurrence day has passed") {
         val anchorStart = LocalDateTime.of(2030, 6, 3, 10, 0) // Monday
         val mondayOnly = RecurrenceDaysMask.fromDayOfWeekSet(setOf(DayOfWeek.MONDAY))
 
@@ -82,7 +83,7 @@ class RecurringEventVisibilityTest : FunSpec({
             anchorStart,
             mondayOnly,
             LocalDateTime.of(2030, 6, 5, 9, 0),
-        ) shouldBe false
+        ) shouldBe true
     }
 
     test("weekly event stays listable when another recurrence day is still upcoming this week") {
@@ -96,15 +97,42 @@ class RecurringEventVisibilityTest : FunSpec({
         ) shouldBe true
     }
 
-    test("monthly event is filtered when occurrence day already passed this month") {
+    test("monthly event stays listable after this month's occurrence day has passed") {
         val anchorStart = LocalDateTime.of(2030, 1, 1, 18, 0)
 
         RecurringEventVisibility.isMonthlyListable(anchorStart, LocalDateTime.of(2030, 5, 1, 9, 0)) shouldBe true
-        RecurringEventVisibility.isMonthlyListable(anchorStart, LocalDateTime.of(2030, 5, 25, 9, 0)) shouldBe false
+        RecurringEventVisibility.isMonthlyListable(anchorStart, LocalDateTime.of(2030, 5, 25, 9, 0)) shouldBe true
     }
 
     test("monthly event clamps anchor day to last valid day of month") {
         RecurringEventVisibility.resolveMonthlyDay(31, YearMonth.of(2030, 2)) shouldBe 28
         RecurringEventVisibility.resolveMonthlyDay(31, YearMonth.of(2028, 2)) shouldBe 29
+    }
+
+    test("recurring event is not listable while pause is active") {
+        val anchorStart = LocalDateTime.of(2030, 6, 3, 10, 0)
+        val event = Event().apply {
+            startTime = anchorStart
+            recurrenceFrequency = RecurrenceFrequency.WEEKLY
+            recurrenceDaysMask = RecurrenceDaysMask.fromDayOfWeekSet(setOf(DayOfWeek.MONDAY)).bits
+            recurrencePausedUntil = LocalDateTime.of(2030, 6, 10, 0, 0)
+        }
+        val now = LocalDateTime.of(2030, 6, 5, 9, 0)
+
+        RecurringEventVisibility.isListable(event, now) shouldBe false
+        RecurringEventVisibility.nextOccurrenceStart(event, now) shouldBe null
+    }
+
+    test("recurring event is listable again after pause ends") {
+        val anchorStart = LocalDateTime.of(2030, 6, 3, 10, 0)
+        val event = Event().apply {
+            startTime = anchorStart
+            recurrenceFrequency = RecurrenceFrequency.WEEKLY
+            recurrenceDaysMask = RecurrenceDaysMask.fromDayOfWeekSet(setOf(DayOfWeek.MONDAY)).bits
+            recurrencePausedUntil = LocalDateTime.of(2030, 6, 10, 0, 0)
+        }
+        val now = LocalDateTime.of(2030, 6, 10, 9, 0)
+
+        RecurringEventVisibility.isListable(event, now) shouldBe true
     }
 })

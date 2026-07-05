@@ -82,6 +82,7 @@ class EventService(
                 this.visibility = visibility
                 applyTags(this.tags, request.tags)
                 eventLocationResolver.apply(this, request.location)
+                applyRecurrencePause(this, request.recurrencePausedUntil)
             }
         ).toDto()
     }
@@ -284,10 +285,17 @@ class EventService(
         if (recurrence == null) {
             event.recurrenceFrequency = RecurrenceFrequency.NONE
             event.recurrenceDaysMask = 0
+            event.recurrencePausedUntil = null
             return
         }
         event.recurrenceFrequency = recurrence.frequency
         event.recurrenceDaysMask = RecurrenceDaysMask.fromDayOfWeekSet(recurrence.daysOfWeek).bits
+        event.recurrencePausedUntil = recurrence.pausedUntil
+    }
+
+    private fun applyRecurrencePause(event: Event, pausedUntil: LocalDateTime?) {
+        RecurringEventVisibility.validatePause(event, pausedUntil)
+        event.recurrencePausedUntil = pausedUntil
     }
 
     private fun addHostParticipant(event: Event, hostUserId: UUID) {
@@ -328,7 +336,6 @@ class EventService(
     }
 
     private fun isVisibleInBrowseList(event: Event, now: LocalDateTime): Boolean {
-        if (event.recurrenceFrequency == RecurrenceFrequency.NONE) return true
         return RecurringEventVisibility.isListable(event, now)
     }
 }
