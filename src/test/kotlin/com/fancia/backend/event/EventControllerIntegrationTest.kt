@@ -159,8 +159,8 @@ class EventControllerIntegrationTest(
                 val requestBody = mapOf(
                     "name" to "testEvent",
                     "description" to "string",
-                    "startTime" to "2024-06-01T10:00:00",
-                    "endTime" to "2024-06-01T12:00:00",
+                    "startTime" to "2030-06-01T10:00:00",
+                    "endTime" to "2030-06-01T12:00:00",
                     "interestGroups" to listOf(testInterestGroupId),
                     "tags" to listOf(mapOf("name" to "good", "type" to "TOPIC")),
                     "visibility" to "PUBLIC",
@@ -234,8 +234,8 @@ class EventControllerIntegrationTest(
                     mapOf(
                         "name" to "Secret Event",
                         "description" to "Invite only",
-                        "startTime" to "2024-06-02T10:00:00",
-                        "endTime" to "2024-06-02T11:00:00",
+                        "startTime" to "2030-06-02T10:00:00",
+                        "endTime" to "2030-06-02T11:00:00",
                         "interestGroups" to listOf(testInterestGroupId),
                         "tags" to listOf(mapOf("name" to "secret", "type" to "TOPIC")),
                         "visibility" to "PRIVATE",
