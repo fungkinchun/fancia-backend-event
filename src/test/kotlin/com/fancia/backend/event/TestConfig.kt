@@ -53,6 +53,9 @@ class TestConfig {
             registry.add("spring.cloud.openfeign.client.config.venue-service.url") {
                 wiremock.baseUrl
             }
+            registry.add("spring.cloud.openfeign.client.config.user-service.url") {
+                wiremock.baseUrl
+            }
         }
     }
 

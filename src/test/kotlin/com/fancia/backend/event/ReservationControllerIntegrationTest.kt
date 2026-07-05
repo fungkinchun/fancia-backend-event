@@ -99,7 +99,6 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.name", `is`("testEvent"))
                 jsonPath("$.id", `is`(notNullValue()))
             }
-
         val createdEvent = response.toEvent(jsonMapper)
         mockMvc
             .post("/api/events/{eventId}/reservations", createdEvent.id) {
@@ -122,7 +121,6 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.userId", `is`(testUserId.toString()))
                 jsonPath("$.status", `is`("PENDING"))
             }
-
         val found = reservationRepository.existsByIdEventIdAndIdUserId(createdEvent.id!!, testUserId)
         found shouldBe true
 

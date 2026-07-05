@@ -72,7 +72,7 @@ class EventController(
     @GetMapping
     @Operation(
         summary = "List events",
-        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link. Supports proximity search when lat/lng are provided. With match=true, returns upcoming events ranked by shared tagIds. With schedule=true, filters by location and excludes events that conflict with the authenticated user's upcoming schedule.",
+        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link. Supports proximity search when lat/lng are provided. With match=true or schedule=true, returns upcoming events ranked by interest relevance (exact and similar tags), blacklist exclusion, location, and schedule fit.",
     )
     @ApiResponses(
         value = [
@@ -88,6 +88,9 @@ class EventController(
         @RequestParam(required = false)
         @Parameter(description = "Filter by tag ids (entities matching any of the ids)")
         tagIds: List<UUID> = emptyList(),
+        @RequestParam(required = false)
+        @Parameter(description = "Exclude events matching these tag, organizer, or group ids (match/schedule only)")
+        blacklistedIds: List<UUID> = emptyList(),
         @RequestParam(required = false, name = "interestGroup")
         @Parameter(description = "Filter events linked to this interest group")
         interestGroup: UUID? = null,
@@ -118,6 +121,7 @@ class EventController(
                 name,
                 description,
                 tagIds,
+                blacklistedIds,
                 interestGroup,
                 lat,
                 lng,

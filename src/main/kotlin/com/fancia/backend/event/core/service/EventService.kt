@@ -5,6 +5,8 @@ import com.fancia.backend.event.core.entity.EventParticipant
 import com.fancia.backend.event.core.entity.EventParticipantId
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.support.RecurringEventVisibility
+import com.fancia.backend.event.core.support.SmartMatchEventRanker
+import com.fancia.backend.event.core.support.SmartMatchPreferences
 import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.event.mapper.toEntity
@@ -38,6 +40,7 @@ class EventService(
     private val eventRepository: EventRepository,
     private val commonServiceClient: CommonServiceClient,
     private val eventLocationResolver: EventLocationResolver,
+    private val smartMatchEventRanker: SmartMatchEventRanker,
 ) {
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event? {
         return eventRepository.findByIdAndCreatedBy(id, createdBy)
@@ -106,6 +109,7 @@ class EventService(
         name: String?,
         description: String?,
         tagIds: List<UUID>?,
+        blacklistedIds: List<UUID>?,
         interestGroupId: UUID?,
         latitude: Double?,
         longitude: Double?,
@@ -121,6 +125,7 @@ class EventService(
                 ?: throw InvalidAuthenticationException()
             return findPersonalized(
                 tagIds,
+                blacklistedIds,
                 interestGroupId,
                 latitude,
                 longitude,
@@ -185,6 +190,7 @@ class EventService(
 
     private fun findPersonalized(
         tagIds: List<UUID>?,
+        blacklistedIds: List<UUID>?,
         interestGroupId: UUID?,
         latitude: Double?,
         longitude: Double?,
@@ -194,60 +200,75 @@ class EventService(
         currentUserId: UUID,
         pageable: Pageable,
     ): Page<EventResponse> {
-        val userTagIds = tagIds.orEmpty().toSet()
+        val tagIds = tagIds.orEmpty().toSet()
+        val preferences = SmartMatchPreferences(
+            tagIds = tagIds,
+            blacklistedIds = blacklistedIds.orEmpty().toSet(),
+            locationLabel = locationLabel?.trim()?.takeIf { it.isNotEmpty() },
+        )
         val now = LocalDateTime.now()
+        val fetchSize = maxOf(pageable.pageSize * 10, 200)
         val candidates = if (schedule) {
-            findScheduleCandidates(userTagIds, latitude, longitude, radiusKm, locationLabel, pageable)
+            findScheduleCandidates(
+                tagIds,
+                latitude,
+                longitude,
+                radiusKm,
+                locationLabel,
+                PageRequest.of(0, fetchSize),
+            )
         } else {
-            findInterestCandidates(userTagIds, pageable)
+            findSmartMatchCandidates(tagIds, PageRequest.of(0, fetchSize))
         }
         val busyEvents = if (schedule) findUpcomingCommitments(currentUserId, now) else emptyList()
-        val filteredAndSorted = candidates
-            .filter { event ->
-                isDiscoverable(event, interestGroupId) &&
-                        RecurringEventVisibility.isListable(event, now) &&
-                        (!schedule || !conflictsWithSchedule(event, busyEvents, now))
-            }
-            .sortedWith(
-                compareByDescending<Event> { sharedTagCount(it, userTagIds) }
-                    .thenBy { RecurringEventVisibility.nextOccurrenceStart(it, now) ?: LocalDateTime.MAX },
-            )
-        val matched = filteredAndSorted
+        val ranked = smartMatchEventRanker.rank(
+            candidates = candidates,
+            preferences = preferences,
+            now = now,
+            schedule = schedule,
+            busyEvents = busyEvents,
+            isDiscoverable = { event -> isDiscoverable(event, interestGroupId) },
+        )
+        val matched = ranked
             .drop(pageable.offset.toInt())
             .take(pageable.pageSize)
-            .map { it.toDto() }
+            .map { rankedEvent -> rankedEvent.event.toDto() }
 
-        return PageImpl(matched, pageable, filteredAndSorted.size.toLong())
+        return PageImpl(matched, pageable, ranked.size.toLong())
     }
 
-    private fun findInterestCandidates(userTagIds: Set<UUID>, pageable: Pageable): List<Event> {
-        if (userTagIds.isEmpty()) {
+    private fun findSmartMatchCandidates(
+        tagIds: Set<UUID>,
+        pageable: Pageable,
+    ): List<Event> {
+        if (tagIds.isEmpty()) {
             return eventRepository.findAll(pageable).content
         }
-        return eventRepository.findByTagIdIn(userTagIds, PageRequest.of(0, maxOf(pageable.pageSize * 5, 100))).content
+        val expandedTagIds = smartMatchEventRanker.expandTagWeights(
+            SmartMatchPreferences(tagIds = tagIds),
+        ).keys
+        val tagFilter = if (expandedTagIds.isEmpty()) tagIds else expandedTagIds
+        return eventRepository.findByTagIdIn(tagFilter, pageable).content
     }
 
     private fun findScheduleCandidates(
-        userTagIds: Set<UUID>,
+        tagIds: Set<UUID>,
         latitude: Double?,
         longitude: Double?,
         radiusKm: Double,
         locationLabel: String?,
         pageable: Pageable,
     ): List<Event> {
-        val fetchSize = maxOf(pageable.pageSize * 5, 100)
-        val nearbyPageable = PageRequest.of(0, fetchSize)
-
         if (latitude != null && longitude != null) {
             val radiusMeters = radiusKm * 1000
-            return eventRepository.findNearby(latitude, longitude, radiusMeters, nearbyPageable).content
+            return eventRepository.findNearby(latitude, longitude, radiusMeters, pageable).content
         }
         val normalizedLocationLabel = locationLabel?.trim()?.lowercase()
         if (normalizedLocationLabel.isNullOrBlank()) {
-            return findInterestCandidates(userTagIds, pageable)
+            return findSmartMatchCandidates(tagIds, pageable)
         }
 
-        return eventRepository.findAll(nearbyPageable).content
+        return eventRepository.findAll(pageable).content
             .filter { event -> matchesLocationLabel(event, normalizedLocationLabel) }
     }
 
@@ -264,21 +285,6 @@ class EventService(
             activeReservationStatuses,
         )
         return (participantEvents + reservationEvents).distinctBy { it.id }
-    }
-
-    private fun conflictsWithSchedule(candidate: Event, busyEvents: List<Event>, now: LocalDateTime): Boolean {
-        val candidateStart = RecurringEventVisibility.nextOccurrenceStart(candidate, now) ?: return false
-        val candidateEnd = RecurringEventVisibility.nextOccurrenceEnd(candidate, now) ?: return false
-        return busyEvents.any { busy ->
-            val busyStart = busy.startTime ?: return@any false
-            val busyEnd = busy.endTime ?: return@any false
-            candidateStart.isBefore(busyEnd) && candidateEnd.isAfter(busyStart)
-        }
-    }
-
-    private fun sharedTagCount(event: Event, userTagIds: Set<UUID>): Int {
-        if (userTagIds.isEmpty()) return 0
-        return event.tags.intersect(userTagIds).size
     }
 
     private fun matchesLocationLabel(event: Event, userLocationLabel: String): Boolean {

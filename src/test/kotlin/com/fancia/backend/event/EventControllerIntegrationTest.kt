@@ -42,6 +42,7 @@ class EventControllerIntegrationTest(
     val testInterestGroupId = UUID.randomUUID()
     val testUserId = UUID.randomUUID()
     val otherUserId = UUID.randomUUID()
+    val tagRegistry = mutableListOf<Pair<UUID, String>>()
 
     beforeSpec {
         configureFor(
@@ -50,8 +51,50 @@ class EventControllerIntegrationTest(
         )
     }
 
-    fun stubCreateTag(name: String): UUID {
-        val tagId = UUID.randomUUID()
+    fun refreshTagLookupStubs() {
+        val tags = tagRegistry.distinct()
+        stubFor(
+            get(urlPathEqualTo("/api/tags/ids"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            jsonMapper.writeValueAsString(
+                                tags.map { (id, name) ->
+                                    mapOf(
+                                        "id" to id.toString(),
+                                        "name" to name,
+                                        "type" to "TOPIC",
+                                    )
+                                },
+                            ),
+                        ),
+                ),
+        )
+        stubFor(
+            get(urlPathEqualTo("/api/tags"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            jsonMapper.writeValueAsString(
+                                mapOf(
+                                    "content" to emptyList<Any>(),
+                                    "totalElements" to 0,
+                                    "totalPages" to 0,
+                                    "size" to 0,
+                                    "number" to 0,
+                                ),
+                            ),
+                        ),
+                ),
+        )
+    }
+
+    fun stubTag(tagId: UUID, name: String) {
+        tagRegistry.add(tagId to name)
         stubFor(
             post(urlPathEqualTo("/api/tags"))
                 .willReturn(
@@ -77,39 +120,16 @@ class EventControllerIntegrationTest(
                         ),
                 ),
         )
+        refreshTagLookupStubs()
+    }
+
+    fun stubCreateTag(name: String): UUID {
+        val tagId = UUID.randomUUID()
+        stubTag(tagId, name)
         return tagId
     }
 
     fun jwtFor(userId: UUID) = jwt().jwt { it.claim("userId", userId) }
-
-    fun stubTag(tagId: UUID, name: String) {
-        stubFor(
-            post(urlPathEqualTo("/api/tags"))
-                .willReturn(
-                    aResponse()
-                        .withStatus(201)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(
-                            jsonMapper.writeValueAsString(
-                                mapOf(
-                                    "content" to listOf(
-                                        mapOf(
-                                            "id" to tagId.toString(),
-                                            "name" to name,
-                                            "type" to "TOPIC",
-                                        ),
-                                    ),
-                                    "totalElements" to 1,
-                                    "totalPages" to 1,
-                                    "size" to 1,
-                                    "number" to 0,
-                                ),
-                            ),
-                        ),
-                ),
-        )
-    }
-
     fun createFutureEvent(
         createdBy: UUID,
         name: String,
@@ -145,11 +165,11 @@ class EventControllerIntegrationTest(
 
     fun preparePersonalizedTest() {
         reset()
+        tagRegistry.clear()
         eventRepository.deleteAll()
     }
 
     test("should create a new event") {
-
         stubCreateTag("good")
         val response = mockMvc
             .post("/api/events") {
@@ -225,7 +245,6 @@ class EventControllerIntegrationTest(
     }
 
     test("should not list private events but allow direct access by id") {
-
         val secretTagId = stubCreateTag("secret")
         val createResponse = mockMvc
             .post("/api/events") {
@@ -331,7 +350,6 @@ class EventControllerIntegrationTest(
         preparePersonalizedTest()
         val hikingTagId = UUID.randomUUID()
         val cookingTagId = UUID.randomUUID()
-
         val matchedEvent = createFutureEvent(
             createdBy = otherUserId,
             name = "Hiking Meetup",
@@ -348,7 +366,6 @@ class EventControllerIntegrationTest(
             tagName = "cooking",
             tagId = cookingTagId,
         )
-
         val response = mockMvc
             .get("/api/events?match=true&tagIds=$hikingTagId") {
                 with(jwtFor(testUserId))
@@ -393,7 +410,6 @@ class EventControllerIntegrationTest(
     test("should match nearby events by location label when schedule=true") {
         preparePersonalizedTest()
         val socialTagId = UUID.randomUUID()
-
         val londonEvent = createFutureEvent(
             createdBy = otherUserId,
             name = "London Social",
@@ -420,7 +436,6 @@ class EventControllerIntegrationTest(
                 "country" to "France",
             ),
         )
-
         val response = mockMvc
             .get("/api/events?schedule=true&locationLabel=London") {
                 with(jwtFor(testUserId))
@@ -439,7 +454,6 @@ class EventControllerIntegrationTest(
     test("should create recurring event as a single row") {
         preparePersonalizedTest()
         stubCreateTag("yoga")
-
         val createResponse = mockMvc
             .post("/api/events") {
                 with(jwtFor(testUserId))
@@ -518,7 +532,6 @@ class EventControllerIntegrationTest(
                 "country" to "UK",
             ),
         )
-
         val response = mockMvc
             .get("/api/events?schedule=true&locationLabel=London") {
                 with(jwtFor(testUserId))
