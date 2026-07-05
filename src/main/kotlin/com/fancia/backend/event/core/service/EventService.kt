@@ -241,14 +241,19 @@ class EventService(
         tagIds: Set<UUID>,
         pageable: Pageable,
     ): List<Event> {
+        val browsePool = { eventRepository.findAll(pageable).content }
         if (tagIds.isEmpty()) {
-            return eventRepository.findAll(pageable).content
+            return browsePool()
         }
         val expandedTagIds = smartMatchEventRanker.expandTagWeights(
             SmartMatchPreferences(tagIds = tagIds),
         ).keys
         val tagFilter = if (expandedTagIds.isEmpty()) tagIds else expandedTagIds
-        return eventRepository.findByTagIdIn(tagFilter, pageable).content
+        val tagged = eventRepository.findByTagIdIn(tagFilter, pageable).content
+        if (tagged.isEmpty()) {
+            return browsePool()
+        }
+        return tagged
     }
 
     private fun findScheduleCandidates(
@@ -259,17 +264,20 @@ class EventService(
         locationLabel: String?,
         pageable: Pageable,
     ): List<Event> {
+        val tagBased = findSmartMatchCandidates(tagIds, pageable)
         if (latitude != null && longitude != null) {
             val radiusMeters = radiusKm * 1000
-            return eventRepository.findNearby(latitude, longitude, radiusMeters, pageable).content
+            val nearby = eventRepository.findNearby(latitude, longitude, radiusMeters, pageable).content
+            return (tagBased + nearby).distinctBy { it.id }.take(pageable.pageSize)
         }
         val normalizedLocationLabel = locationLabel?.trim()?.lowercase()
         if (normalizedLocationLabel.isNullOrBlank()) {
-            return findSmartMatchCandidates(tagIds, pageable)
+            return tagBased
         }
 
-        return eventRepository.findAll(pageable).content
+        val locationBased = eventRepository.findAll(pageable).content
             .filter { event -> matchesLocationLabel(event, normalizedLocationLabel) }
+        return (tagBased + locationBased).distinctBy { it.id }.take(pageable.pageSize)
     }
 
     private fun findUpcomingCommitments(userId: UUID, from: LocalDateTime): List<Event> {
