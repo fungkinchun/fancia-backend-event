@@ -112,6 +112,9 @@ class EventController(
         @RequestParam(name = "schedule", defaultValue = "false")
         @Parameter(description = "When true, match nearby events that fit the authenticated user's free schedule")
         schedule: Boolean,
+        @RequestParam(required = false)
+        @Parameter(description = "List events the user hosts or attends (includes past). Hidden unless privacy.showEvents is explicitly true, except when the viewer is that user.")
+        userId: UUID?,
         @AuthenticationPrincipal jwt: Jwt?,
         @PageableDefault(size = 20)
         pageable: Pageable,
@@ -129,6 +132,7 @@ class EventController(
                 locationLabel,
                 match,
                 schedule,
+                userId,
                 jwt,
                 pageable,
             ),

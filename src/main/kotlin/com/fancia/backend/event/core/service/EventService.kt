@@ -8,6 +8,7 @@ import com.fancia.backend.event.core.support.RecurringEventVisibility
 import com.fancia.backend.event.core.support.SmartMatchEventRanker
 import com.fancia.backend.event.core.support.SmartMatchPreferences
 import com.fancia.backend.event.external.CommonServiceClient
+import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
@@ -39,6 +40,7 @@ import java.util.*
 class EventService(
     private val eventRepository: EventRepository,
     private val commonServiceClient: CommonServiceClient,
+    private val userServiceClient: UserServiceClient,
     private val eventLocationResolver: EventLocationResolver,
     private val smartMatchEventRanker: SmartMatchEventRanker,
 ) {
@@ -117,9 +119,18 @@ class EventService(
         locationLabel: String?,
         match: Boolean,
         schedule: Boolean,
+        userId: UUID?,
         jwt: Jwt?,
         pageable: Pageable,
     ): Page<EventResponse> {
+        if (userId != null) {
+            val viewerId = jwt?.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            if (!canViewUserEvents(userId, viewerId)) {
+                return PageImpl(emptyList(), pageable, 0)
+            }
+            return eventRepository.findByUserInvolvement(userId, pageable).map { it.toDto() }
+        }
+
         if (match || schedule) {
             val currentUserId = jwt?.getClaimAsString("userId")?.let { UUID.fromString(it) }
                 ?: throw InvalidAuthenticationException()
@@ -264,20 +275,25 @@ class EventService(
         locationLabel: String?,
         pageable: Pageable,
     ): List<Event> {
-        val tagBased = findSmartMatchCandidates(tagIds, pageable)
         if (latitude != null && longitude != null) {
             val radiusMeters = radiusKm * 1000
             val nearby = eventRepository.findNearby(latitude, longitude, radiusMeters, pageable).content
+            val tagBased = if (tagIds.isEmpty()) emptyList() else findSmartMatchCandidates(tagIds, pageable)
             return (tagBased + nearby).distinctBy { it.id }.take(pageable.pageSize)
         }
         val normalizedLocationLabel = locationLabel?.trim()?.lowercase()
-        if (normalizedLocationLabel.isNullOrBlank()) {
-            return tagBased
+        if (!normalizedLocationLabel.isNullOrBlank()) {
+            val locationBased = eventRepository.findAll(pageable).content
+                .filter { event -> matchesLocationLabel(event, normalizedLocationLabel) }
+            val tagBased = if (tagIds.isEmpty()) {
+                emptyList()
+            } else {
+                findSmartMatchCandidates(tagIds, pageable)
+                    .filter { event -> matchesLocationLabel(event, normalizedLocationLabel) }
+            }
+            return (tagBased + locationBased).distinctBy { it.id }.take(pageable.pageSize)
         }
-
-        val locationBased = eventRepository.findAll(pageable).content
-            .filter { event -> matchesLocationLabel(event, normalizedLocationLabel) }
-        return (tagBased + locationBased).distinctBy { it.id }.take(pageable.pageSize)
+        return findSmartMatchCandidates(tagIds, pageable)
     }
 
     private fun findUpcomingCommitments(userId: UUID, from: LocalDateTime): List<Event> {
@@ -368,5 +384,11 @@ class EventService(
 
     private fun isVisibleInBrowseList(event: Event, now: LocalDateTime): Boolean {
         return RecurringEventVisibility.isListable(event, now)
+    }
+
+    private fun canViewUserEvents(targetUserId: UUID, viewerId: UUID?): Boolean {
+        if (viewerId == targetUserId) return true
+        val user = runCatching { userServiceClient.getUser(targetUserId) }.getOrNull() ?: return false
+        return user.privacy.showEvents == true
     }
 }

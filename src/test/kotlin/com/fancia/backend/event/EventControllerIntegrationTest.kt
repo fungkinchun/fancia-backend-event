@@ -93,6 +93,30 @@ class EventControllerIntegrationTest(
         )
     }
 
+    fun stubUser(userId: UUID, showEvents: Boolean? = true) {
+        val privacyBody = if (showEvents == null) {
+            emptyMap<String, Any>()
+        } else {
+            mapOf("showEvents" to showEvents)
+        }
+        stubFor(
+            get(urlPathEqualTo("/api/users/$userId"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                            jsonMapper.writeValueAsString(
+                                mapOf(
+                                    "id" to userId.toString(),
+                                    "privacy" to privacyBody,
+                                ),
+                            ),
+                        ),
+                ),
+        )
+    }
+
     fun stubTag(tagId: UUID, name: String) {
         tagRegistry.add(tagId to name)
         stubFor(
@@ -546,6 +570,103 @@ class EventControllerIntegrationTest(
 
         response.content.map { it.id } shouldContain freeEvent.id
         response.content.map { it.id } shouldNotContain conflictingEvent.id
+    }
+
+    test("should list past and upcoming events for a user via userId filter") {
+        preparePersonalizedTest()
+        stubUser(testUserId, showEvents = true)
+        val tagId = stubCreateTag("past-host")
+        val pastEvent = createFutureEvent(
+            createdBy = testUserId,
+            name = "Past hosted event",
+            startTime = "2020-06-01T10:00:00",
+            endTime = "2020-06-01T12:00:00",
+            tagName = "past-host",
+            tagId = tagId,
+        )
+        val upcomingEvent = createFutureEvent(
+            createdBy = testUserId,
+            name = "Upcoming hosted event",
+            startTime = "2030-06-01T10:00:00",
+            endTime = "2030-06-01T12:00:00",
+            tagName = "past-host",
+            tagId = tagId,
+        )
+
+        mockMvc
+            .get("/api/events?tagIds=$tagId&page=0&size=10") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(1))
+                jsonPath("$.content[0].id", `is`(upcomingEvent.id.toString()))
+            }
+
+        val mine = mockMvc
+            .get("/api/events?userId=$testUserId&page=0&size=10") {
+                with(jwtFor(testUserId))
+                accept = APPLICATION_JSON
+            }
+            .andExpect { status { isOk() } }
+            .toEventPage(jsonMapper)
+
+        mine.content.map { it.id } shouldContain pastEvent.id
+        mine.content.map { it.id } shouldContain upcomingEvent.id
+    }
+
+    test("should hide another user's events when showEvents privacy is disabled") {
+        preparePersonalizedTest()
+        stubUser(testUserId, showEvents = false)
+        val tagId = stubCreateTag("hidden-events")
+        createFutureEvent(
+            createdBy = testUserId,
+            name = "Hidden hosted event",
+            startTime = "2030-06-01T10:00:00",
+            endTime = "2030-06-01T12:00:00",
+            tagName = "hidden-events",
+            tagId = tagId,
+        )
+
+        val response = mockMvc
+            .get("/api/events?userId=$testUserId&page=0&size=10") {
+                with(jwtFor(otherUserId))
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(0))
+            }
+            .toEventPage(jsonMapper)
+
+        response.content shouldBe emptyList()
+    }
+
+    test("should hide another user's events when showEvents privacy is unset") {
+        preparePersonalizedTest()
+        stubUser(testUserId, showEvents = null)
+        val tagId = stubCreateTag("unset-events")
+        createFutureEvent(
+            createdBy = testUserId,
+            name = "Unset privacy event",
+            startTime = "2030-06-01T10:00:00",
+            endTime = "2030-06-01T12:00:00",
+            tagName = "unset-events",
+            tagId = tagId,
+        )
+
+        val response = mockMvc
+            .get("/api/events?userId=$testUserId&page=0&size=10") {
+                with(jwtFor(otherUserId))
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(0))
+            }
+            .toEventPage(jsonMapper)
+
+        response.content shouldBe emptyList()
     }
 
     afterSpec {

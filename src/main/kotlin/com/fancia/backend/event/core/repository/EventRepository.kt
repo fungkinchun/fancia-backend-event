@@ -47,6 +47,20 @@ interface EventRepository : JpaRepository<Event, UUID> {
 
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event?
 
+    @Query(
+        """
+        SELECT DISTINCT e
+        FROM Event e
+        LEFT JOIN e.participants p
+        WHERE e.createdBy = :userId OR p.id.userId = :userId
+        ORDER BY e.startTime DESC NULLS LAST
+        """,
+    )
+    fun findByUserInvolvement(
+        @Param("userId") userId: UUID,
+        pageable: Pageable,
+    ): Page<Event>
+
     @Query("SELECT e FROM Event e WHERE :tagId MEMBER OF e.tags")
     fun findByTagId(@Param("tagId") tagId: UUID): List<Event>
 
