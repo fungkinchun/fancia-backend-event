@@ -1,6 +1,5 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.external.CommonInternalClient
 import com.fancia.backend.shared.common.comment.core.dto.CommentResponse
@@ -17,47 +16,56 @@ import java.util.*
 @Service
 class EventCommentService(
     private val eventRepository: EventRepository,
-    private val eventParticipantRepository: EventParticipantRepository,
-    private val eventPostService: EventPostService,
+    private val eventOccurrenceService: EventOccurrenceService,
     private val commonInternalClient: CommonInternalClient,
 ) {
-    fun create(eventId: UUID, request: CreateCommentRequest, jwt: Jwt): CommentResponse {
-        if (!eventRepository.existsById(eventId)) {
-            throw EventNotFoundException(eventId)
-        }
+    fun create(
+        eventId: UUID,
+        occurrenceId: UUID,
+        request: CreateCommentRequest,
+        jwt: Jwt,
+    ): CommentResponse {
+        validateOccurrence(eventId, occurrenceId)
         return commonInternalClient.createComment(request)
     }
 
     fun list(
         eventId: UUID,
+        occurrenceId: UUID,
         targetId: UUID,
         pageable: Pageable,
     ): Page<CommentResponse> {
-        if (!eventRepository.existsById(eventId)) {
-            throw EventNotFoundException(eventId)
-        }
-        return commonInternalClient.listComments(targetId, eventId, pageable)
+        validateOccurrence(eventId, occurrenceId)
+        return commonInternalClient.listComments(targetId, occurrenceId, pageable)
     }
 
-    fun get(eventId: UUID, commentId: UUID): CommentResponse {
+    fun get(eventId: UUID, occurrenceId: UUID, commentId: UUID): CommentResponse {
+        validateOccurrence(eventId, occurrenceId)
         val comment = commonInternalClient.getComment(commentId)
-        if (comment.resourceId != eventId) {
+        if (comment.resourceId != occurrenceId) {
             throw CommentNotFoundException(commentId)
         }
         return comment
     }
 
-    fun like(eventId: UUID, commentId: UUID, jwt: Jwt) {
+    fun like(eventId: UUID, occurrenceId: UUID, commentId: UUID, jwt: Jwt) {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        get(eventId, commentId)
+        get(eventId, occurrenceId, commentId)
         commonInternalClient.likeComment(commentId)
     }
 
-    fun unlike(eventId: UUID, commentId: UUID, jwt: Jwt) {
+    fun unlike(eventId: UUID, occurrenceId: UUID, commentId: UUID, jwt: Jwt) {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        get(eventId, commentId)
+        get(eventId, occurrenceId, commentId)
         commonInternalClient.unlikeComment(commentId)
+    }
+
+    private fun validateOccurrence(eventId: UUID, occurrenceId: UUID) {
+        if (!eventRepository.existsById(eventId)) {
+            throw EventNotFoundException(eventId)
+        }
+        eventOccurrenceService.getOccurrence(eventId, occurrenceId)
     }
 }

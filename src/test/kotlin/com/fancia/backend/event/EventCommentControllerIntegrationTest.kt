@@ -1,5 +1,6 @@
 package com.fancia.backend.event
 
+import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.shared.common.comment.core.dto.CommentResponse
 import com.github.tomakehurst.wiremock.client.WireMock.*
@@ -9,6 +10,7 @@ import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.data.domain.PageRequest
 import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
@@ -27,6 +29,7 @@ import java.util.*
 class EventCommentControllerIntegrationTest(
     private val mockMvc: MockMvc,
     private val eventRepository: EventRepository,
+    private val eventOccurrenceRepository: EventOccurrenceRepository,
     private val jsonMapper: JsonMapper,
     private val wiremock: WireMockContainer,
 ) : FunSpec({
@@ -88,7 +91,7 @@ class EventCommentControllerIntegrationTest(
                         "tags" to listOf(mapOf("name" to tagName, "type" to "TOPIC")),
                         "visibility" to "PUBLIC",
                         "links" to emptyList<Any>(),
-                    )
+                    ),
                 )
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
@@ -104,16 +107,24 @@ class EventCommentControllerIntegrationTest(
         return UUID.fromString(jsonMapper.readTree(responseBody).get("id").asText())
     }
 
-    test("should forward event wall comment creation to common-internal") {
+    fun firstOccurrenceId(eventId: UUID): UUID {
+        return eventOccurrenceRepository.findByEventIdOrderByStartTimeAsc(eventId, PageRequest.of(0, 1))
+            .content
+            .first()
+            .id!!
+    }
+
+    test("should forward occurrence wall comment creation to common-internal") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val commentId = UUID.randomUUID()
         val commonResponse = CommentResponse(
             id = commentId,
-            targetId = eventId,
-            resourceId = eventId,
+            targetId = occurrenceId,
+            resourceId = occurrenceId,
             authorUserId = userId,
-            body = "Great event",
+            body = "Great session",
             createdAt = null,
         )
         stubFor(
@@ -122,19 +133,19 @@ class EventCommentControllerIntegrationTest(
                     aResponse()
                         .withStatus(201)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(commonResponse))
-                )
+                        .withBody(jsonMapper.writeValueAsString(commonResponse)),
+                ),
         )
 
         mockMvc
-            .post("/api/events/$eventId/comments") {
+            .post("/api/events/$eventId/occurrences/$occurrenceId/comments") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
-                        "targetId" to eventId.toString(),
-                        "resourceId" to eventId.toString(),
-                        "body" to "Great event",
-                    )
+                        "targetId" to occurrenceId.toString(),
+                        "resourceId" to occurrenceId.toString(),
+                        "body" to "Great session",
+                    ),
                 )
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
@@ -142,27 +153,28 @@ class EventCommentControllerIntegrationTest(
             .andExpect {
                 status { isCreated() }
                 jsonPath("$.id", `is`(commentId.toString()))
-                jsonPath("$.targetId", `is`(eventId.toString()))
-                jsonPath("$.resourceId", `is`(eventId.toString()))
+                jsonPath("$.targetId", `is`(occurrenceId.toString()))
+                jsonPath("$.resourceId", `is`(occurrenceId.toString()))
             }
 
         verify(
             postRequestedFor(urlPathEqualTo("/internal/comments"))
-                .withRequestBody(matchingJsonPath("$.targetId", equalTo(eventId.toString())))
-                .withRequestBody(matchingJsonPath("$.resourceId", equalTo(eventId.toString())))
-                .withRequestBody(matchingJsonPath("$.body", equalTo("Great event"))),
+                .withRequestBody(matchingJsonPath("$.targetId", equalTo(occurrenceId.toString())))
+                .withRequestBody(matchingJsonPath("$.resourceId", equalTo(occurrenceId.toString())))
+                .withRequestBody(matchingJsonPath("$.body", equalTo("Great session"))),
         )
     }
 
     test("should forward post comment creation to common-internal") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val postId = UUID.randomUUID()
         val commentId = UUID.randomUUID()
         val commonResponse = CommentResponse(
             id = commentId,
             targetId = postId,
-            resourceId = postId,
+            resourceId = occurrenceId,
             authorUserId = userId,
             body = "Nice post",
             createdAt = null,
@@ -173,19 +185,19 @@ class EventCommentControllerIntegrationTest(
                     aResponse()
                         .withStatus(201)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(commonResponse))
-                )
+                        .withBody(jsonMapper.writeValueAsString(commonResponse)),
+                ),
         )
 
         mockMvc
-            .post("/api/events/$eventId/comments") {
+            .post("/api/events/$eventId/occurrences/$occurrenceId/comments") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
                         "targetId" to postId.toString(),
-                        "resourceId" to postId.toString(),
+                        "resourceId" to occurrenceId.toString(),
                         "body" to "Nice post",
-                    )
+                    ),
                 )
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
@@ -193,30 +205,31 @@ class EventCommentControllerIntegrationTest(
             .andExpect {
                 status { isCreated() }
                 jsonPath("$.id", `is`(commentId.toString()))
-                jsonPath("$.resourceId", `is`(postId.toString()))
+                jsonPath("$.resourceId", `is`(occurrenceId.toString()))
             }
 
         verify(
             postRequestedFor(urlPathEqualTo("/internal/comments"))
                 .withRequestBody(matchingJsonPath("$.targetId", equalTo(postId.toString())))
-                .withRequestBody(matchingJsonPath("$.resourceId", equalTo(postId.toString())))
+                .withRequestBody(matchingJsonPath("$.resourceId", equalTo(occurrenceId.toString())))
                 .withRequestBody(matchingJsonPath("$.body", equalTo("Nice post"))),
         )
     }
 
     test("should return bad request when event does not exist") {
         val missingEventId = UUID.randomUUID()
+        val missingOccurrenceId = UUID.randomUUID()
         val userId = UUID.randomUUID()
 
         mockMvc
-            .post("/api/events/$missingEventId/comments") {
+            .post("/api/events/$missingEventId/occurrences/$missingOccurrenceId/comments") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
-                        "targetId" to missingEventId.toString(),
-                        "resourceId" to missingEventId.toString(),
+                        "targetId" to missingOccurrenceId.toString(),
+                        "resourceId" to missingOccurrenceId.toString(),
                         "body" to "Should fail",
-                    )
+                    ),
                 )
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
@@ -226,9 +239,10 @@ class EventCommentControllerIntegrationTest(
         verify(0, postRequestedFor(urlPathEqualTo("/internal/comments")))
     }
 
-    test("should list event wall comments with targetId defaulting to eventId") {
+    test("should list occurrence wall comments with targetId defaulting to occurrenceId") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val pageResponse = mapOf(
             "content" to emptyList<Any>(),
             "totalElements" to 0,
@@ -238,32 +252,33 @@ class EventCommentControllerIntegrationTest(
         )
         stubFor(
             get(urlPathEqualTo("/internal/comments"))
-                .withQueryParam("targetId", equalTo(eventId.toString()))
-                .withQueryParam("resourceId", equalTo(eventId.toString()))
+                .withQueryParam("targetId", equalTo(occurrenceId.toString()))
+                .withQueryParam("resourceId", equalTo(occurrenceId.toString()))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(pageResponse))
-                )
+                        .withBody(jsonMapper.writeValueAsString(pageResponse)),
+                ),
         )
 
         mockMvc
-            .get("/api/events/$eventId/comments") {
+            .get("/api/events/$eventId/occurrences/$occurrenceId/comments") {
                 accept = APPLICATION_JSON
             }
             .andExpect { status { isOk() } }
 
         verify(
             getRequestedFor(urlPathEqualTo("/internal/comments"))
-                .withQueryParam("targetId", equalTo(eventId.toString()))
-                .withQueryParam("resourceId", equalTo(eventId.toString())),
+                .withQueryParam("targetId", equalTo(occurrenceId.toString()))
+                .withQueryParam("resourceId", equalTo(occurrenceId.toString())),
         )
     }
 
     test("should list post comments when targetId is post id") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val postId = UUID.randomUUID()
         val pageResponse = mapOf(
             "content" to emptyList<Any>(),
@@ -275,17 +290,17 @@ class EventCommentControllerIntegrationTest(
         stubFor(
             get(urlPathEqualTo("/internal/comments"))
                 .withQueryParam("targetId", equalTo(postId.toString()))
-                .withQueryParam("resourceId", equalTo(eventId.toString()))
+                .withQueryParam("resourceId", equalTo(occurrenceId.toString()))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(pageResponse))
-                )
+                        .withBody(jsonMapper.writeValueAsString(pageResponse)),
+                ),
         )
 
         mockMvc
-            .get("/api/events/$eventId/comments") {
+            .get("/api/events/$eventId/occurrences/$occurrenceId/comments") {
                 param("targetId", postId.toString())
                 accept = APPLICATION_JSON
             }
@@ -294,13 +309,14 @@ class EventCommentControllerIntegrationTest(
         verify(
             getRequestedFor(urlPathEqualTo("/internal/comments"))
                 .withQueryParam("targetId", equalTo(postId.toString()))
-                .withQueryParam("resourceId", equalTo(eventId.toString())),
+                .withQueryParam("resourceId", equalTo(occurrenceId.toString())),
         )
     }
 
     test("should list replies when targetId is parent comment id") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val parentCommentId = UUID.randomUUID()
         val pageResponse = mapOf(
             "content" to emptyList<Any>(),
@@ -312,17 +328,17 @@ class EventCommentControllerIntegrationTest(
         stubFor(
             get(urlPathEqualTo("/internal/comments"))
                 .withQueryParam("targetId", equalTo(parentCommentId.toString()))
-                .withQueryParam("resourceId", equalTo(eventId.toString()))
+                .withQueryParam("resourceId", equalTo(occurrenceId.toString()))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(pageResponse))
-                )
+                        .withBody(jsonMapper.writeValueAsString(pageResponse)),
+                ),
         )
 
         mockMvc
-            .get("/api/events/$eventId/comments") {
+            .get("/api/events/$eventId/occurrences/$occurrenceId/comments") {
                 param("targetId", parentCommentId.toString())
                 accept = APPLICATION_JSON
             }
@@ -331,18 +347,19 @@ class EventCommentControllerIntegrationTest(
         verify(
             getRequestedFor(urlPathEqualTo("/internal/comments"))
                 .withQueryParam("targetId", equalTo(parentCommentId.toString()))
-                .withQueryParam("resourceId", equalTo(eventId.toString())),
+                .withQueryParam("resourceId", equalTo(occurrenceId.toString())),
         )
     }
 
     test("should forward like to common-internal") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val commentId = UUID.randomUUID()
         val comment = CommentResponse(
             id = commentId,
-            targetId = eventId,
-            resourceId = eventId,
+            targetId = occurrenceId,
+            resourceId = occurrenceId,
             authorUserId = userId,
             body = "Wall comment",
             createdAt = null,
@@ -353,16 +370,16 @@ class EventCommentControllerIntegrationTest(
                     aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(comment))
-                )
+                        .withBody(jsonMapper.writeValueAsString(comment)),
+                ),
         )
         stubFor(
             post(urlPathEqualTo("/internal/comments/$commentId/likes"))
-                .willReturn(aResponse().withStatus(204))
+                .willReturn(aResponse().withStatus(204)),
         )
 
         mockMvc
-            .post("/api/events/$eventId/comments/$commentId/likes") {
+            .post("/api/events/$eventId/occurrences/$occurrenceId/comments/$commentId/likes") {
                 with(jwt().jwt { it.claim("userId", userId) })
             }
             .andExpect { status { isNoContent() } }
@@ -373,11 +390,12 @@ class EventCommentControllerIntegrationTest(
     test("should forward unlike to common-internal") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val commentId = UUID.randomUUID()
         val comment = CommentResponse(
             id = commentId,
-            targetId = eventId,
-            resourceId = eventId,
+            targetId = occurrenceId,
+            resourceId = occurrenceId,
             authorUserId = userId,
             body = "Wall comment",
             createdAt = null,
@@ -388,16 +406,16 @@ class EventCommentControllerIntegrationTest(
                     aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(comment))
-                )
+                        .withBody(jsonMapper.writeValueAsString(comment)),
+                ),
         )
         stubFor(
             delete(urlPathEqualTo("/internal/comments/$commentId/likes"))
-                .willReturn(aResponse().withStatus(204))
+                .willReturn(aResponse().withStatus(204)),
         )
 
         mockMvc
-            .delete("/api/events/$eventId/comments/$commentId/likes") {
+            .delete("/api/events/$eventId/occurrences/$occurrenceId/comments/$commentId/likes") {
                 with(jwt().jwt { it.claim("userId", userId) })
             }
             .andExpect { status { isNoContent() } }

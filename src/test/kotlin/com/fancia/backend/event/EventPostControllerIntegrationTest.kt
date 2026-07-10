@@ -1,5 +1,6 @@
 package com.fancia.backend.event
 
+import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.shared.common.post.core.dto.PostMediaResponse
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
@@ -12,6 +13,7 @@ import org.hamcrest.CoreMatchers.notNullValue
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.data.domain.PageRequest
 import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
@@ -29,6 +31,7 @@ import java.util.*
 class EventPostControllerIntegrationTest(
     private val mockMvc: MockMvc,
     private val eventRepository: EventRepository,
+    private val eventOccurrenceRepository: EventOccurrenceRepository,
     private val jsonMapper: JsonMapper,
     private val wiremock: WireMockContainer,
 ) : FunSpec({
@@ -90,7 +93,7 @@ class EventPostControllerIntegrationTest(
                         "tags" to listOf(mapOf("name" to tagName, "type" to "TOPIC")),
                         "visibility" to "PUBLIC",
                         "links" to emptyList<Any>(),
-                    )
+                    ),
                 )
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
@@ -106,13 +109,21 @@ class EventPostControllerIntegrationTest(
         return UUID.fromString(jsonMapper.readTree(responseBody).get("id").asText())
     }
 
+    fun firstOccurrenceId(eventId: UUID): UUID {
+        return eventOccurrenceRepository.findByEventIdOrderByStartTimeAsc(eventId, PageRequest.of(0, 1))
+            .content
+            .first()
+            .id!!
+    }
+
     test("should forward featured post creation to common-internal with featured and pinned fields") {
         val userId = UUID.randomUUID()
         val eventId = createEventViaApi(userId)
+        val occurrenceId = firstOccurrenceId(eventId)
         val postId = UUID.randomUUID()
         val commonResponse = PostResponse(
             id = postId,
-            targetId = eventId,
+            targetId = occurrenceId,
             authorUserId = userId,
             body = null,
             media = listOf(
@@ -137,8 +148,8 @@ class EventPostControllerIntegrationTest(
                     aResponse()
                         .withStatus(201)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(jsonMapper.writeValueAsString(commonResponse))
-                )
+                        .withBody(jsonMapper.writeValueAsString(commonResponse)),
+                ),
         )
         val requestBody = mapOf(
             "body" to null,
@@ -156,7 +167,7 @@ class EventPostControllerIntegrationTest(
             "pinned" to false,
         )
         val responseBody = mockMvc
-            .post("/api/events/$eventId/posts") {
+            .post("/api/events/$eventId/occurrences/$occurrenceId/posts") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
@@ -165,7 +176,7 @@ class EventPostControllerIntegrationTest(
             .andExpect {
                 status { isCreated() }
                 jsonPath("$.id", `is`(postId.toString()))
-                jsonPath("$.targetId", `is`(eventId.toString()))
+                jsonPath("$.targetId", `is`(occurrenceId.toString()))
                 jsonPath("$.featured", `is`(true))
                 jsonPath("$.pinned", `is`(false))
                 jsonPath("$.media.length()", `is`(2))
@@ -179,7 +190,7 @@ class EventPostControllerIntegrationTest(
 
         verify(
             postRequestedFor(urlPathEqualTo("/internal/posts"))
-                .withRequestBody(matchingJsonPath("$.targetId", equalTo(eventId.toString())))
+                .withRequestBody(matchingJsonPath("$.targetId", equalTo(occurrenceId.toString())))
                 .withRequestBody(matchingJsonPath("$.authorUserId", equalTo(userId.toString())))
                 .withRequestBody(matchingJsonPath("$.featured", equalTo("true")))
                 .withRequestBody(matchingJsonPath("$.pinned", equalTo("false")))
@@ -187,13 +198,13 @@ class EventPostControllerIntegrationTest(
         )
     }
 
-
     test("should return bad request when event does not exist") {
         val missingEventId = UUID.randomUUID()
+        val missingOccurrenceId = UUID.randomUUID()
         val userId = UUID.randomUUID()
 
         mockMvc
-            .post("/api/events/$missingEventId/posts") {
+            .post("/api/events/$missingEventId/occurrences/$missingOccurrenceId/posts") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -201,7 +212,7 @@ class EventPostControllerIntegrationTest(
                         "media" to emptyList<Any>(),
                         "featured" to false,
                         "pinned" to false,
-                    )
+                    ),
                 )
                 contentType = APPLICATION_JSON
                 accept = APPLICATION_JSON
