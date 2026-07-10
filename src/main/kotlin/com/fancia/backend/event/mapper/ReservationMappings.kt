@@ -5,12 +5,14 @@ import com.fancia.backend.event.core.entity.ReservationId
 import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
 import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
+import java.util.UUID
 
-fun Reservation.toDto(): ReservationResponse =
+fun Reservation.toDto(eventId: UUID): ReservationResponse =
     ReservationResponse(
-        eventId = this@toDto.id?.eventId,
-        userId = this@toDto.id?.userId,
-        status = this@toDto.status,
+        eventId = eventId,
+        occurrenceId = id?.occurrenceId,
+        userId = id?.userId,
+        status = status,
     )
 
 fun CreateReservationRequest.toEntity(): Reservation =
@@ -23,12 +25,3 @@ fun UpdateReservationRequest.toEntity(reservation: Reservation): Reservation {
     reservation.status = this@toEntity.status
     return reservation
 }
-
-fun ReservationResponse.toEntity(): Reservation =
-    Reservation(
-        id = ReservationId(
-            eventId = this@toEntity.eventId,
-            userId = this@toEntity.userId,
-        ),
-    ).apply {
-    }

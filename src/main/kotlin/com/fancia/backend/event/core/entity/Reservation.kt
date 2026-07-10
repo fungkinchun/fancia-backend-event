@@ -7,27 +7,27 @@ import java.util.*
 
 @Embeddable
 data class ReservationId(
-    @Column(name = "event_id")
-    var eventId: UUID? = null,
+    @Column(name = "occurrence_id")
+    var occurrenceId: UUID? = null,
     @Column(name = "user_id")
     var userId: UUID? = null,
 ) : Serializable {
     override fun equals(other: Any?): Boolean =
-        other is ReservationId && other.eventId == eventId && other.userId == userId
+        other is ReservationId && other.occurrenceId == occurrenceId && other.userId == userId
 
-    override fun hashCode(): Int = Objects.hash(eventId, userId)
+    override fun hashCode(): Int = Objects.hash(occurrenceId, userId)
 }
 
 @Entity
 @Table(name = "reservations")
 class Reservation(
     @EmbeddedId
-    var id: ReservationId? = null
+    var id: ReservationId? = null,
 ) {
-    @MapsId("eventId")
+    @MapsId("occurrenceId")
     @ManyToOne
-    @JoinColumn(name = "event_id", insertable = false, updatable = false)
-    var event: Event? = null
+    @JoinColumn(name = "occurrence_id", insertable = false, updatable = false)
+    var occurrence: EventOccurrence? = null
     var guests: Int = 0
 
     @Column(length = 4000)

@@ -19,27 +19,28 @@ import java.util.*
 
 @RestController
 @RequestMapping("/api/events")
-@Tag(name = "Reservations", description = "Reservation endpoints")
+@Tag(name = "Event Participants", description = "Event participant endpoints")
 @SecurityRequirement(name = "bearerAuth")
 class EventParticipantController(
-    private val eventParticipantService: EventParticipantService
+    private val eventParticipantService: EventParticipantService,
 ) {
-    @GetMapping("/{eventId}/participants")
+    @GetMapping("/{eventId}/occurrences/{occurrenceId}/participants")
     @Operation(
-        summary = "List event participants",
-        description = "Returns a paginated list of participants for the specified event"
+        summary = "List occurrence participants",
+        description = "Returns a paginated list of participants for a specific occurrence",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "List of event participants returned"),
-        ]
+            ApiResponse(responseCode = "200", description = "List of occurrence participants returned"),
+        ],
     )
-    fun listEventParticipants(
+    fun listOccurrenceParticipants(
         @PathVariable eventId: UUID,
+        @PathVariable occurrenceId: UUID,
         @PageableDefault(size = 20)
-        pageable: Pageable
+        pageable: Pageable,
     ): ResponseEntity<Page<EventParticipantResponse>> {
-        val participants = eventParticipantService.findParticipants(eventId, pageable)
+        val participants = eventParticipantService.findParticipants(eventId, occurrenceId, pageable)
         return ResponseEntity.ok(participants)
     }
 }

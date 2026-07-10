@@ -7,27 +7,27 @@ import java.util.*
 
 @Embeddable
 data class EventParticipantId(
-    val eventId: UUID,
-    val userId: UUID
+    val occurrenceId: UUID,
+    val userId: UUID,
 ) : Serializable {
     override fun equals(other: Any?): Boolean =
         other is EventParticipantId &&
-                other.eventId == eventId &&
-                other.userId == userId
+            other.occurrenceId == occurrenceId &&
+            other.userId == userId
 
-    override fun hashCode(): Int = Objects.hash(eventId, userId)
+    override fun hashCode(): Int = Objects.hash(occurrenceId, userId)
 }
 
 @Entity
 @Table(name = "event_participants")
 class EventParticipant(
     @EmbeddedId
-    var id: EventParticipantId
+    var id: EventParticipantId,
 ) {
-    @MapsId("eventId")
+    @MapsId("occurrenceId")
     @ManyToOne
-    @JoinColumn(name = "event_id", insertable = false, updatable = false)
-    var event: Event? = null
+    @JoinColumn(name = "occurrence_id", insertable = false, updatable = false)
+    var occurrence: EventOccurrence? = null
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role")

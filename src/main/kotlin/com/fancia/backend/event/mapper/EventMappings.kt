@@ -1,6 +1,7 @@
 package com.fancia.backend.event.mapper
 
 import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.event.core.entity.EventOccurrence
 import com.fancia.backend.event.core.entity.EventParticipant
 import com.fancia.backend.event.core.support.EventLocationSupport
 import com.fancia.backend.shared.common.social.core.dto.LinkItem
@@ -10,7 +11,7 @@ import com.fancia.backend.shared.event.core.dto.*
 import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import com.fancia.backend.shared.event.core.model.RecurrenceDaysMask
 
-fun Event.toDto(): EventResponse =
+fun Event.toDto(nextOccurrence: EventOccurrence? = null): EventResponse =
     EventResponse(
         id = this@toDto.id,
         name = this@toDto.name,
@@ -18,8 +19,8 @@ fun Event.toDto(): EventResponse =
         interestGroups = this@toDto.interestGroups,
         createdBy = this@toDto.createdBy,
         createdAt = this@toDto.createdAt,
-        startTime = this@toDto.startTime,
-        endTime = this@toDto.endTime,
+        startTime = nextOccurrence?.startTime ?: this@toDto.startTime,
+        endTime = nextOccurrence?.endTime ?: this@toDto.endTime,
         tags = this@toDto.tags,
         visibility = this@toDto.visibility,
         location = EventLocationSupport.toDto(this),

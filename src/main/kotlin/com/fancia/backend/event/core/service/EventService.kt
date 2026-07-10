@@ -1,9 +1,9 @@
 package com.fancia.backend.event.core.service
 
 import com.fancia.backend.event.core.entity.Event
-import com.fancia.backend.event.core.entity.EventParticipant
-import com.fancia.backend.event.core.entity.EventParticipantId
+import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.event.core.support.BusyOccurrence
 import com.fancia.backend.event.core.support.RecurringEventVisibility
 import com.fancia.backend.event.core.support.SmartMatchEventRanker
 import com.fancia.backend.event.core.support.SmartMatchPreferences
@@ -39,6 +39,8 @@ import java.util.*
 @Service
 class EventService(
     private val eventRepository: EventRepository,
+    private val eventOccurrenceRepository: EventOccurrenceRepository,
+    private val eventOccurrenceService: EventOccurrenceService,
     private val commonServiceClient: CommonServiceClient,
     private val userServiceClient: UserServiceClient,
     private val eventLocationResolver: EventLocationResolver,
@@ -49,9 +51,10 @@ class EventService(
     }
 
     fun findById(id: UUID): EventResponse {
-        return eventRepository.findById(id)
-            .map { it.toDto() }
-            .orElseThrow { EventNotFoundException(id) }
+        val event = eventRepository.findById(id).orElseThrow { EventNotFoundException(id) }
+        val now = LocalDateTime.now()
+        val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, now)
+        return event.toDto(nextOccurrence)
     }
 
     @Transactional
@@ -69,8 +72,14 @@ class EventService(
             eventLocationResolver.apply(it, request.location)
             applyRecurrence(it, request.recurrence)
             val savedEvent = eventRepository.save(it)
-            addHostParticipant(savedEvent, currentUserId)
-            return savedEvent.toDto()
+            eventOccurrenceService.createInitialOccurrence(
+                savedEvent,
+                request.startTime,
+                request.endTime,
+                currentUserId,
+            )
+            val nextOccurrence = eventOccurrenceService.findNextUpcoming(savedEvent, LocalDateTime.now())
+            return savedEvent.toDto(nextOccurrence)
         }
     }
 
@@ -92,8 +101,11 @@ class EventService(
                 } else {
                     this.recurrencePausedUntil = null
                 }
-            }
-        ).toDto()
+            },
+        ).let { updated ->
+            val nextOccurrence = eventOccurrenceService.findNextUpcoming(updated, LocalDateTime.now())
+            updated.toDto(nextOccurrence)
+        }
     }
 
     @Transactional
@@ -128,7 +140,11 @@ class EventService(
             if (!canViewUserEvents(userId, viewerId)) {
                 return PageImpl(emptyList(), pageable, 0)
             }
-            return eventRepository.findByUserInvolvement(userId, pageable).map { it.toDto() }
+            return eventOccurrenceRepository.findEventsByUserInvolvement(userId, pageable)
+                .map { event ->
+                    val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
+                    event.toDto(nextOccurrence)
+                }
         }
 
         if (match || schedule) {
@@ -154,7 +170,10 @@ class EventService(
                 eventRepository.findNearby(latitude, longitude, radiusMeters, browseFetchPageable(pageable)).content,
                 interestGroupId,
                 pageable,
-            ).map { it.toDto() }
+            ).map { event ->
+                val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
+                event.toDto(nextOccurrence)
+            }
         }
         val trimmedName = name?.trim().orEmpty()
         val trimmedDescription = description?.trim().orEmpty()
@@ -177,7 +196,11 @@ class EventService(
                     fetchPageable,
                 )
         }
-        return paginateDiscoverable(events.content, interestGroupId, pageable).map { it.toDto() }
+        return paginateDiscoverable(events.content, interestGroupId, pageable)
+            .map { event ->
+                val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
+                event.toDto(nextOccurrence)
+            }
     }
 
     private fun browseFetchPageable(pageable: Pageable): Pageable {
@@ -231,19 +254,22 @@ class EventService(
         } else {
             findSmartMatchCandidates(tagIds, PageRequest.of(0, fetchSize))
         }
-        val busyEvents = if (schedule) findUpcomingCommitments(currentUserId, now) else emptyList()
+        val busyOccurrences = if (schedule) findUpcomingCommitments(currentUserId, now) else emptyList()
         val ranked = smartMatchEventRanker.rank(
             candidates = candidates,
             preferences = preferences,
             now = now,
             schedule = schedule,
-            busyEvents = busyEvents,
+            busyOccurrences = busyOccurrences,
             isDiscoverable = { event -> isDiscoverable(event, interestGroupId) },
         )
         val matched = ranked
             .drop(pageable.offset.toInt())
             .take(pageable.pageSize)
-            .map { rankedEvent -> rankedEvent.event.toDto() }
+            .map { rankedEvent ->
+                val nextOccurrence = eventOccurrenceService.findNextUpcoming(rankedEvent.event, now)
+                rankedEvent.event.toDto(nextOccurrence)
+            }
 
         return PageImpl(matched, pageable, ranked.size.toLong())
     }
@@ -296,19 +322,27 @@ class EventService(
         return findSmartMatchCandidates(tagIds, pageable)
     }
 
-    private fun findUpcomingCommitments(userId: UUID, from: LocalDateTime): List<Event> {
+    private fun findUpcomingCommitments(userId: UUID, from: LocalDateTime): List<BusyOccurrence> {
         val activeReservationStatuses = listOf(
             ReservationStatus.ACCEPTED,
             ReservationStatus.WHITELIST,
             ReservationStatus.PENDING,
         )
-        val participantEvents = eventRepository.findUpcomingForParticipant(userId, from)
-        val reservationEvents = eventRepository.findUpcomingForReservation(
+        val participantOccurrences = eventOccurrenceRepository.findUpcomingForParticipant(userId, from)
+        val reservationOccurrences = eventOccurrenceRepository.findUpcomingForReservation(
             userId,
             from,
             activeReservationStatuses,
         )
-        return (participantEvents + reservationEvents).distinctBy { it.id }
+        return (participantOccurrences + reservationOccurrences)
+            .distinctBy { it.id }
+            .map { occurrence ->
+                BusyOccurrence(
+                    eventId = occurrence.event?.id ?: error("Occurrence missing event"),
+                    startTime = occurrence.startTime,
+                    endTime = occurrence.endTime,
+                )
+            }
     }
 
     private fun matchesLocationLabel(event: Event, userLocationLabel: String): Boolean {
@@ -353,16 +387,9 @@ class EventService(
         event.recurrencePausedUntil = pausedUntil
     }
 
-    private fun addHostParticipant(event: Event, hostUserId: UUID) {
-        val eventId = event.id ?: return
-        val participant = EventParticipant(
-            EventParticipantId(
-                eventId = eventId,
-                userId = hostUserId,
-            ),
-        )
-        participant.event = event
-        event.participants.add(participant)
+    private fun isVisibleInBrowseList(event: Event, now: LocalDateTime): Boolean {
+        eventOccurrenceService.ensureUpcomingOccurrences(event, now)
+        return RecurringEventVisibility.isListable(event, now)
     }
 
     private fun validateSchedule(startTime: LocalDateTime, endTime: LocalDateTime) {
@@ -380,10 +407,6 @@ class EventService(
             EventVisibility.PUBLIC ->
                 interestGroupId == null || event.interestGroups.contains(interestGroupId)
         }
-    }
-
-    private fun isVisibleInBrowseList(event: Event, now: LocalDateTime): Boolean {
-        return RecurringEventVisibility.isListable(event, now)
     }
 
     private fun canViewUserEvents(targetUserId: UUID, viewerId: UUID?): Boolean {

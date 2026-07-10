@@ -80,7 +80,7 @@ class SmartMatchEventRankerTest : FunSpec({
             preferences = preferences,
             now = now,
             schedule = false,
-            busyEvents = emptyList(),
+            busyOccurrences = emptyList(),
             isDiscoverable = { true },
         )
 
@@ -101,7 +101,7 @@ class SmartMatchEventRankerTest : FunSpec({
             preferences = preferences,
             now = now,
             schedule = false,
-            busyEvents = emptyList(),
+            busyOccurrences = emptyList(),
             isDiscoverable = { true },
         )
 
@@ -121,7 +121,7 @@ class SmartMatchEventRankerTest : FunSpec({
             preferences = preferences,
             now = now,
             schedule = false,
-            busyEvents = emptyList(),
+            busyOccurrences = emptyList(),
             isDiscoverable = { true },
         )
 

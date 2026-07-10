@@ -30,10 +30,7 @@ class Event : AbstractEntity() {
     var interestGroups: MutableSet<UUID> = mutableSetOf()
 
     @OneToMany(mappedBy = "event", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val participants: MutableSet<EventParticipant> = mutableSetOf<EventParticipant>()
-
-    @OneToMany(mappedBy = "event", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val reservations: MutableSet<Reservation> = mutableSetOf<Reservation>()
+    val occurrences: MutableSet<EventOccurrence> = mutableSetOf()
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "event_tags", joinColumns = [JoinColumn(name = "event_id")])

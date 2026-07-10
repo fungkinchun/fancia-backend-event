@@ -47,52 +47,8 @@ interface EventRepository : JpaRepository<Event, UUID> {
 
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event?
 
-    @Query(
-        """
-        SELECT DISTINCT e
-        FROM Event e
-        LEFT JOIN e.participants p
-        WHERE e.createdBy = :userId OR p.id.userId = :userId
-        ORDER BY e.startTime DESC NULLS LAST
-        """,
-    )
-    fun findByUserInvolvement(
-        @Param("userId") userId: UUID,
-        pageable: Pageable,
-    ): Page<Event>
-
     @Query("SELECT e FROM Event e WHERE :tagId MEMBER OF e.tags")
     fun findByTagId(@Param("tagId") tagId: UUID): List<Event>
-
-    @Query(
-        """
-        SELECT DISTINCT e
-        FROM Event e
-        JOIN e.participants p
-        WHERE p.id.userId = :userId
-          AND e.startTime >= :from
-        """,
-    )
-    fun findUpcomingForParticipant(
-        @Param("userId") userId: UUID,
-        @Param("from") from: java.time.LocalDateTime,
-    ): List<Event>
-
-    @Query(
-        """
-        SELECT DISTINCT e
-        FROM Event e
-        JOIN e.reservations r
-        WHERE r.id.userId = :userId
-          AND r.status IN :statuses
-          AND e.startTime >= :from
-        """,
-    )
-    fun findUpcomingForReservation(
-        @Param("userId") userId: UUID,
-        @Param("from") from: java.time.LocalDateTime,
-        @Param("statuses") statuses: Collection<com.fancia.backend.shared.event.core.enums.ReservationStatus>,
-    ): List<Event>
 
     @Query(
         value = """

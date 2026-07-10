@@ -1,6 +1,7 @@
 package com.fancia.backend.event
 
 import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.event.core.dto.EventResponse
@@ -16,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -37,6 +39,7 @@ class EventControllerIntegrationTest(
     private val mockMvc: MockMvc,
     private val wiremock: WireMockContainer,
     private val eventRepository: EventRepository,
+    private val eventOccurrenceRepository: EventOccurrenceRepository,
     private val jsonMapper: JsonMapper,
 ) : FunSpec({
     val testInterestGroupId = UUID.randomUUID()
@@ -475,7 +478,7 @@ class EventControllerIntegrationTest(
         response.content.map { it.id } shouldContain londonEvent.id
     }
 
-    test("should create recurring event as a single row") {
+    test("should create recurring event with initial occurrence") {
         preparePersonalizedTest()
         stubCreateTag("yoga")
         val createResponse = mockMvc
@@ -509,6 +512,10 @@ class EventControllerIntegrationTest(
 
         eventRepository.findAll().size shouldBe 1
         eventRepository.findByIdOrNull(createResponse.id!!)?.recurrenceFrequency shouldBe RecurrenceFrequency.WEEKLY
+        eventOccurrenceRepository.findByEventIdOrderByStartTimeAsc(
+            createResponse.id!!,
+            PageRequest.of(0, 10),
+        ).totalElements shouldBe 1
     }
 
     test("should exclude schedule conflicts when schedule=true") {

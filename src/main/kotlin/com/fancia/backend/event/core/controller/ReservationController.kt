@@ -1,8 +1,8 @@
 package com.fancia.backend.event.core.controller
 
+import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.fancia.backend.event.core.service.ReservationService
 import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
-import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -25,29 +25,31 @@ class ReservationController(
 ) {
     @Operation(
         summary = "Create reservation",
-        description = "Returns the newly created reservation"
+        description = "Returns the newly created reservation for a specific occurrence",
     )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "Reservation created"),
-        ]
+        ],
     )
-    @PostMapping("/{eventId}/reservations")
+    @PostMapping("/{eventId}/occurrences/{occurrenceId}/reservations")
     fun createReservation(
         @PathVariable eventId: UUID,
+        @PathVariable occurrenceId: UUID,
         @RequestBody @Valid request: CreateReservationRequest,
-        @AuthenticationPrincipal jwt: Jwt
+        @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<ReservationResponse> {
-        return ResponseEntity.ok(reservationService.create(eventId, request, jwt))
+        return ResponseEntity.ok(reservationService.create(eventId, occurrenceId, request, jwt))
     }
 
-    @PatchMapping("/{eventId}/users/{userId}/reservations")
+    @PatchMapping("/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations")
     fun updateReservation(
         @PathVariable eventId: UUID,
+        @PathVariable occurrenceId: UUID,
         @PathVariable userId: UUID,
         @RequestBody @Valid request: UpdateReservationRequest,
-        @AuthenticationPrincipal jwt: Jwt
+        @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<ReservationResponse> {
-        return ResponseEntity.ok(reservationService.update(eventId, userId, request, jwt))
+        return ResponseEntity.ok(reservationService.update(eventId, occurrenceId, userId, request, jwt))
     }
 }

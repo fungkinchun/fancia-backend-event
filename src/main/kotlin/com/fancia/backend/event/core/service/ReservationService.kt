@@ -1,16 +1,17 @@
 package com.fancia.backend.event.core.service
 
+import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.core.entity.EventParticipant
 import com.fancia.backend.event.core.entity.EventParticipantId
 import com.fancia.backend.event.core.entity.ReservationId
 import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
-import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.event.mapper.toEntity
+import com.fancia.backend.event.mapper.toDto
+import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
-import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
 import com.fancia.backend.shared.event.core.enums.EventRole
 import com.fancia.backend.shared.event.core.enums.ReservationStatus
@@ -25,38 +26,53 @@ import java.util.*
 @Service
 class ReservationService(
     private val eventRepository: EventRepository,
+    private val eventOccurrenceService: EventOccurrenceService,
     private val eventParticipantRepository: EventParticipantRepository,
     private val reservationRepository: ReservationRepository,
     private val eventUserTagSyncService: EventUserTagSyncService,
 ) {
     @Transactional
-    fun create(eventId: UUID, request: @Valid CreateReservationRequest, jwt: Jwt): ReservationResponse {
+    fun create(
+        eventId: UUID,
+        occurrenceId: UUID,
+        request: @Valid CreateReservationRequest,
+        jwt: Jwt,
+    ): ReservationResponse {
         val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         val event = eventRepository.findByIdOrNull(eventId)
             ?: throw EventNotFoundException(eventId)
-        if (reservationRepository.existsByIdEventIdAndIdUserId(eventId, currentUserId)) {
+        val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
+        if (reservationRepository.existsByIdOccurrenceIdAndIdUserId(occurrenceId, currentUserId)) {
             throw ReservationAlreadyExistsException(eventId, currentUserId)
         }
         val reservation = request.toEntity()
-        reservation.event = event
+        reservation.occurrence = occurrence
         reservation.id = ReservationId(
-            eventId = event.id!!,
-            currentUserId
+            occurrenceId = occurrence.id!!,
+            userId = currentUserId,
         )
         val saved = reservationRepository.save(reservation)
         eventUserTagSyncService.syncEventTagsOnJoin(currentUserId, event)
-        return saved.toDto()
+        return saved.toDto(eventId)
     }
 
     @Transactional
-    fun update(eventId: UUID, userId: UUID, request: @Valid UpdateReservationRequest, jwt: Jwt): ReservationResponse {
+    fun update(
+        eventId: UUID,
+        occurrenceId: UUID,
+        userId: UUID,
+        request: @Valid UpdateReservationRequest,
+        jwt: Jwt,
+    ): ReservationResponse {
         val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        val isAdmin = eventParticipantRepository.existsByIdEventIdAndIdUserIdAndRole(
-            eventId,
+        eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
+        eventOccurrenceService.getOccurrence(eventId, occurrenceId)
+        val isAdmin = eventParticipantRepository.existsByIdOccurrenceIdAndIdUserIdAndRole(
+            occurrenceId,
             currentUserId,
-            EventRole.HOST
+            EventRole.HOST,
         )
 
         when {
@@ -66,35 +82,32 @@ class ReservationService(
             !isAdmin && request.status != ReservationStatus.WITHDREW ->
                 throw ReservationStatusChangeAccessDeniedException()
         }
-        val reservation = reservationRepository.findByIdEventIdAndIdUserId(eventId, userId)
+        val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
             ?: throw ReservationNotFoundException(eventId, userId)
         request.toEntity(reservation)
-        val event = eventRepository.findByIdOrNull(eventId)
-            ?: throw EventNotFoundException(eventId)
+        val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
 
         when (request.status) {
             ReservationStatus.ACCEPTED -> {
-                if (event.participants.none { it.id.userId == userId }) {
+                if (occurrence.participants.none { it.id.userId == userId }) {
                     val newParticipant = EventParticipant(
                         EventParticipantId(
-                            eventId = eventId,
-                            userId = userId
-                        )
+                            occurrenceId = occurrenceId,
+                            userId = userId,
+                        ),
                     ).apply {
-                        this.event = event
+                        this.occurrence = occurrence
                     }
-                    event.participants.add(newParticipant)
-                    eventRepository.save(event)
+                    occurrence.participants.add(newParticipant)
                 }
             }
 
             ReservationStatus.WITHDREW -> {
-                event.participants.removeIf { it.id.userId == userId }
-                eventRepository.save(event)
+                occurrence.participants.removeIf { it.id.userId == userId }
             }
 
             else -> {}
         }
-        return reservationRepository.save(reservation).toDto()
+        return reservationRepository.save(reservation).toDto(eventId)
     }
 }

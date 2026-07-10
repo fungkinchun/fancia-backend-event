@@ -71,7 +71,7 @@ class SmartMatchEventRanker(
         preferences: SmartMatchPreferences,
         now: LocalDateTime,
         schedule: Boolean,
-        busyEvents: List<Event>,
+        busyOccurrences: List<BusyOccurrence>,
         isDiscoverable: (Event) -> Boolean,
     ): List<RankedEvent> {
         val tagWeights = expandTagWeights(preferences)
@@ -81,7 +81,7 @@ class SmartMatchEventRanker(
                 isDiscoverable(event) &&
                     RecurringEventVisibility.isListable(event, now) &&
                     !isBlacklisted(event, preferences.blacklistedIds) &&
-                    (!schedule || !conflictsWithSchedule(event, busyEvents, now))
+                    (!schedule || !conflictsWithSchedule(event, busyOccurrences, now))
             }
             .map { event -> RankedEvent(event, score(event, tagWeights, preferences, now)) }
             .sortedWith(
@@ -116,13 +116,15 @@ class SmartMatchEventRanker(
             normalized.contains(eventLocations.substringBefore(",").trim())
     }
 
-    private fun conflictsWithSchedule(candidate: Event, busyEvents: List<Event>, now: LocalDateTime): Boolean {
+    private fun conflictsWithSchedule(
+        candidate: Event,
+        busyOccurrences: List<BusyOccurrence>,
+        now: LocalDateTime,
+    ): Boolean {
         val candidateStart = RecurringEventVisibility.nextOccurrenceStart(candidate, now) ?: return false
         val candidateEnd = RecurringEventVisibility.nextOccurrenceEnd(candidate, now) ?: return false
-        return busyEvents.any { busy ->
-            val busyStart = busy.startTime ?: return@any false
-            val busyEnd = busy.endTime ?: return@any false
-            candidateStart.isBefore(busyEnd) && candidateEnd.isAfter(busyStart)
+        return busyOccurrences.any { busy ->
+            candidateStart.isBefore(busy.endTime) && candidateEnd.isAfter(busy.startTime)
         }
     }
 
