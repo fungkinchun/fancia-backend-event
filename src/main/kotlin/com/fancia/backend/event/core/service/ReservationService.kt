@@ -1,6 +1,6 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.event.core.entity.EventOccurrence
 import com.fancia.backend.event.core.entity.EventParticipant
 import com.fancia.backend.event.core.entity.EventParticipantId
 import com.fancia.backend.event.core.entity.ReservationId
@@ -67,8 +67,8 @@ class ReservationService(
         val event = eventRepository.findByIdOrNull(eventId)
             ?: throw EventNotFoundException(eventId)
         val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
-        if (reservationRepository.existsByIdOccurrenceIdAndIdUserId(occurrenceId, currentUserId)) {
-            throw ReservationAlreadyExistsException(eventId, currentUserId)
+        reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, currentUserId)?.let {
+            return it.toDto(eventId)
         }
         val reservation = request.toEntity()
         reservation.occurrence = occurrence
@@ -76,6 +76,10 @@ class ReservationService(
             occurrenceId = occurrence.id!!,
             userId = currentUserId,
         )
+        if (!event.approvalRequired) {
+            reservation.status = ReservationStatus.ACCEPTED
+            addGuestParticipant(occurrence, currentUserId)
+        }
         val saved = reservationRepository.save(reservation)
         eventUserTagSyncService.syncEventTagsOnJoin(currentUserId, event)
         return saved.toDto(eventId)
@@ -112,26 +116,26 @@ class ReservationService(
         val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
 
         when (request.status) {
-            ReservationStatus.ACCEPTED -> {
-                if (occurrence.participants.none { it.id.userId == userId }) {
-                    val newParticipant = EventParticipant(
-                        EventParticipantId(
-                            occurrenceId = occurrenceId,
-                            userId = userId,
-                        ),
-                    ).apply {
-                        this.occurrence = occurrence
-                    }
-                    occurrence.participants.add(newParticipant)
-                }
-            }
-
+            ReservationStatus.ACCEPTED -> addGuestParticipant(occurrence, userId)
             ReservationStatus.WITHDREW -> {
                 occurrence.participants.removeIf { it.id.userId == userId }
             }
-
             else -> {}
         }
         return reservationRepository.save(reservation).toDto(eventId)
+    }
+
+    private fun addGuestParticipant(occurrence: EventOccurrence, userId: UUID) {
+        if (occurrence.participants.any { it.id.userId == userId }) return
+        val participant = EventParticipant(
+            EventParticipantId(
+                occurrenceId = occurrence.id!!,
+                userId = userId,
+            ),
+        ).apply {
+            this.occurrence = occurrence
+            this.role = EventRole.GUEST
+        }
+        occurrence.participants.add(participant)
     }
 }

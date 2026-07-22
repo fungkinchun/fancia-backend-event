@@ -17,6 +17,8 @@ fun Reservation.toDto(eventId: UUID): ReservationResponse =
 
 fun CreateReservationRequest.toEntity(): Reservation =
     Reservation().apply {
+        guests = this@toEntity.guests
+        payload = this@toEntity.payload
     }
 
 fun UpdateReservationRequest.toEntity(reservation: Reservation): Reservation {

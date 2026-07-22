@@ -21,6 +21,10 @@ class Event : AbstractEntity() {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var visibility: EventVisibility = EventVisibility.PUBLIC
+
+    @Column(name = "approval_required", nullable = false)
+    var approvalRequired: Boolean = true
+
     var startTime: LocalDateTime? = null
     var endTime: LocalDateTime? = null
 

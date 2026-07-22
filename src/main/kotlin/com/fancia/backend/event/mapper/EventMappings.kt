@@ -26,6 +26,7 @@ fun Event.toDto(nextOccurrence: EventOccurrence? = null): EventResponse =
         location = EventLocationSupport.toDto(this),
         links = this@toDto.links.map { it.toDto() }.toSet(),
         recurrence = toRecurrenceDto(this@toDto),
+        approvalRequired = this@toDto.approvalRequired,
     )
 
 fun CreateEventRequest.toEntity(): Event =
@@ -36,6 +37,7 @@ fun CreateEventRequest.toEntity(): Event =
         endTime = this@toEntity.endTime
         interestGroups = this@toEntity.interestGroups.toMutableSet()
         links = this@toEntity.links.map { it.toEntity() }.toMutableSet()
+        approvalRequired = this@toEntity.approvalRequired ?: true
     }
 
 fun UpdateEventRequest.toEntity(event: Event): Event {
@@ -44,6 +46,7 @@ fun UpdateEventRequest.toEntity(event: Event): Event {
     event.endTime = this@toEntity.endTime
     event.links.clear()
     event.links.addAll(this@toEntity.links.map { it.toEntity() })
+    this@toEntity.approvalRequired?.let { event.approvalRequired = it }
     return event
 }
 
@@ -60,6 +63,7 @@ fun EventResponse.toEntity(): Event =
         tags = this@toEntity.tags.toMutableSet()
         visibility = this@toEntity.visibility
         links = this@toEntity.links.map { it.toEntity() }.toMutableSet()
+        approvalRequired = this@toEntity.approvalRequired
         EventLocationSupport.applyFromDto(this, this@toEntity.location)
     }
 
