@@ -95,27 +95,39 @@ class ReservationService(
     ): ReservationResponse {
         val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
-        eventOccurrenceService.getOccurrence(eventId, occurrenceId)
+        val event = eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
+        val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
         val isAdmin = eventParticipantRepository.existsByIdOccurrenceIdAndIdUserIdAndRole(
             occurrenceId,
             currentUserId,
             EventRole.HOST,
         )
+        val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
+            ?: throw ReservationNotFoundException(eventId, userId)
+
+        val isReRequest =
+            request.status == ReservationStatus.PENDING &&
+                (
+                    reservation.status == ReservationStatus.WITHDREW ||
+                        reservation.status == ReservationStatus.DENIED
+                    )
 
         when {
             !isAdmin && currentUserId != userId ->
                 throw ReservationChangeDeniedException(eventId = eventId, userId)
 
-            !isAdmin && request.status != ReservationStatus.WITHDREW ->
+            !isAdmin &&
+                request.status != ReservationStatus.WITHDREW &&
+                !isReRequest ->
                 throw ReservationStatusChangeAccessDeniedException()
         }
-        val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
-            ?: throw ReservationNotFoundException(eventId, userId)
-        request.toEntity(reservation)
-        val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
 
-        when (request.status) {
+        request.toEntity(reservation)
+        if (isReRequest && !event.approvalRequired) {
+            reservation.status = ReservationStatus.ACCEPTED
+        }
+
+        when (reservation.status) {
             ReservationStatus.ACCEPTED -> addGuestParticipant(occurrence, userId)
             ReservationStatus.WITHDREW -> {
                 occurrence.participants.removeIf { it.id.userId == userId }
