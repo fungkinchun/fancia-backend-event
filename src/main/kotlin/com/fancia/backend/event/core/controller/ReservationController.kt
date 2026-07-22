@@ -24,6 +24,25 @@ class ReservationController(
     private val reservationService: ReservationService,
 ) {
     @Operation(
+        summary = "Get reservation",
+        description = "Returns a reservation for a specific occurrence and user",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Reservation found"),
+        ],
+    )
+    @GetMapping("/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations")
+    fun getReservation(
+        @PathVariable eventId: UUID,
+        @PathVariable occurrenceId: UUID,
+        @PathVariable userId: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<ReservationResponse> {
+        return ResponseEntity.ok(reservationService.get(eventId, occurrenceId, userId, jwt))
+    }
+
+    @Operation(
         summary = "Create reservation",
         description = "Returns the newly created reservation for a specific occurrence",
     )

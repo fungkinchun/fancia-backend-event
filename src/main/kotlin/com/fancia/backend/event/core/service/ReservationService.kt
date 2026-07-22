@@ -31,6 +31,30 @@ class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val eventUserTagSyncService: EventUserTagSyncService,
 ) {
+    @Transactional(readOnly = true)
+    fun get(
+        eventId: UUID,
+        occurrenceId: UUID,
+        userId: UUID,
+        jwt: Jwt,
+    ): ReservationResponse {
+        val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
+        eventOccurrenceService.getOccurrence(eventId, occurrenceId)
+        val isAdmin = eventParticipantRepository.existsByIdOccurrenceIdAndIdUserIdAndRole(
+            occurrenceId,
+            currentUserId,
+            EventRole.HOST,
+        )
+        if (!isAdmin && currentUserId != userId) {
+            throw ReservationChangeDeniedException(eventId = eventId, userId)
+        }
+        val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
+            ?: throw ReservationNotFoundException(eventId, userId)
+        return reservation.toDto(eventId)
+    }
+
     @Transactional
     fun create(
         eventId: UUID,
