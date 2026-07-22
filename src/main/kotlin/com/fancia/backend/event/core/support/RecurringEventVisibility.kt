@@ -58,16 +58,18 @@ object RecurringEventVisibility {
     fun nextOccurrenceStart(event: Event, now: LocalDateTime): LocalDateTime? {
         if (!isListable(event, now)) return null
         val anchorStart = event.startTime ?: return null
+        // Never schedule before the event's first occurrence.
+        val from = if (now.isBefore(anchorStart)) anchorStart else now
         return when (event.recurrenceFrequency) {
             RecurrenceFrequency.NONE -> anchorStart
-            RecurrenceFrequency.DAILY -> now.toLocalDate().atTime(anchorStart.toLocalTime())
+            RecurrenceFrequency.DAILY -> from.toLocalDate().atTime(anchorStart.toLocalTime())
             RecurrenceFrequency.WEEKLY -> nextWeeklyOccurrenceStart(
                 anchorStart,
                 RecurrenceDaysMask(event.recurrenceDaysMask),
-                now
+                from,
             )
 
-            RecurrenceFrequency.MONTHLY -> nextMonthlyOccurrenceStart(anchorStart, now)
+            RecurrenceFrequency.MONTHLY -> nextMonthlyOccurrenceStart(anchorStart, from)
         }
     }
 
@@ -129,8 +131,12 @@ object RecurringEventVisibility {
         now: LocalDateTime,
     ): LocalDateTime? {
         val today = now.dayOfWeek
+        val anchorTime = anchorStart.toLocalTime()
         if (daysMask.contains(today)) {
-            return now.toLocalDate().atTime(anchorStart.toLocalTime())
+            val todayStart = now.toLocalDate().atTime(anchorTime)
+            if (!todayStart.isBefore(now)) {
+                return todayStart
+            }
         }
         val nextDay =
             daysMask.toDayOfWeekSet().filter { it.value > today.value }.minByOrNull { it.value }
@@ -142,7 +148,7 @@ object RecurringEventVisibility {
             } else {
                 7 - today.value + nextDay.value
             }
-        return now.toLocalDate().plusDays(daysUntil.toLong()).atTime(anchorStart.toLocalTime())
+        return now.toLocalDate().plusDays(daysUntil.toLong()).atTime(anchorTime)
     }
 
     private fun nextMonthlyOccurrenceStart(anchorStart: LocalDateTime, now: LocalDateTime): LocalDateTime {

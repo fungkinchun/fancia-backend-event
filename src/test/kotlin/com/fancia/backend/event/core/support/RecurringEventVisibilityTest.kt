@@ -147,4 +147,19 @@ class RecurringEventVisibilityTest : FunSpec({
 
         RecurringEventVisibility.isListable(event, now) shouldBe true
     }
+
+    test("next weekly occurrence does not start before event startTime") {
+        val anchorStart = LocalDateTime.of(2030, 6, 3, 10, 0) // Monday
+        val event = Event().apply {
+            startTime = anchorStart
+            endTime = LocalDateTime.of(2030, 6, 3, 11, 0)
+            recurrenceFrequency = RecurrenceFrequency.WEEKLY
+            recurrenceDaysMask = RecurrenceDaysMask
+                .fromDayOfWeekSet(setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY))
+                .bits
+        }
+        val now = LocalDateTime.of(2026, 7, 22, 12, 0) // Wednesday, years before start
+
+        RecurringEventVisibility.nextOccurrenceStart(event, now) shouldBe anchorStart
+    }
 })

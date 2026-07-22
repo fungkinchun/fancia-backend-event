@@ -229,6 +229,94 @@ class ReservationControllerIntegrationTest(
             }
     }
 
+    test("guest can withdraw and re-request reservation") {
+        val hostUserId = UUID.randomUUID()
+        val guestUserId = UUID.randomUUID()
+        val testInterestGroupId = UUID.randomUUID()
+        stubCreateTag("rerequest")
+        val response = mockMvc
+            .post("/api/events") {
+                with(jwt().jwt {
+                    it.claim("userId", hostUserId)
+                })
+                val requestBody = mapOf(
+                    "name" to "rerequestEvent",
+                    "description" to "string",
+                    "startTime" to "2024-06-01T10:00:00",
+                    "endTime" to "2024-06-01T12:00:00",
+                    "interestGroups" to listOf(testInterestGroupId),
+                    "tags" to listOf(mapOf("name" to "rerequest", "type" to "TOPIC")),
+                    "visibility" to "PUBLIC",
+                    "links" to emptyList<Any>(),
+                    "approvalRequired" to true,
+                )
+                content = jsonMapper.writeValueAsString(requestBody)
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+            }
+        val createdEvent = response.toEvent(jsonMapper)
+        val occurrenceId = firstOccurrenceId(createdEvent.id!!)
+
+        mockMvc
+            .post("/api/events/{eventId}/occurrences/{occurrenceId}/reservations", createdEvent.id, occurrenceId) {
+                with(jwt().jwt {
+                    it.claim("userId", guestUserId)
+                })
+                content = jsonMapper.writeValueAsString(mapOf("guests" to 0, "payload" to ""))
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status", `is`("PENDING"))
+            }
+
+        mockMvc.patch(
+            "/api/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
+            createdEvent.id,
+            occurrenceId,
+            guestUserId,
+        ) {
+            with(jwt().jwt {
+                it.claim("userId", guestUserId)
+            })
+            content = jsonMapper.writeValueAsString(
+                mapOf("guests" to 0, "payload" to "", "status" to "WITHDREW"),
+            )
+            contentType = APPLICATION_JSON
+            accept = APPLICATION_JSON
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status", `is`("WITHDREW"))
+            }
+
+        mockMvc.patch(
+            "/api/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
+            createdEvent.id,
+            occurrenceId,
+            guestUserId,
+        ) {
+            with(jwt().jwt {
+                it.claim("userId", guestUserId)
+            })
+            content = jsonMapper.writeValueAsString(
+                mapOf("guests" to 0, "payload" to "", "status" to "PENDING"),
+            )
+            contentType = APPLICATION_JSON
+            accept = APPLICATION_JSON
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status", `is`("PENDING"))
+            }
+
+        reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, guestUserId)!!.status?.name shouldBe "PENDING"
+    }
+
     afterSpec {
         reservationRepository.deleteAll()
     }

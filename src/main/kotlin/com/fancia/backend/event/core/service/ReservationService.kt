@@ -105,27 +105,16 @@ class ReservationService(
         val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
             ?: throw ReservationNotFoundException(eventId, userId)
 
-        val isReRequest =
-            request.status == ReservationStatus.PENDING &&
-                (
-                    reservation.status == ReservationStatus.WITHDREW ||
-                        reservation.status == ReservationStatus.DENIED
-                    )
-
-        when {
-            !isAdmin && currentUserId != userId ->
-                throw ReservationChangeDeniedException(eventId = eventId, userId)
-
-            !isAdmin &&
-                request.status != ReservationStatus.WITHDREW &&
-                !isReRequest ->
-                throw ReservationStatusChangeAccessDeniedException()
+        if (!isAdmin && currentUserId != userId) {
+            throw ReservationChangeDeniedException(eventId = eventId, userId)
         }
 
-        request.toEntity(reservation)
-        if (isReRequest && !event.approvalRequired) {
-            reservation.status = ReservationStatus.ACCEPTED
-        }
+        val previousStatus = reservation.status
+        assertNonAdminMayChangeStatus(isAdmin, previousStatus, request.status)
+
+        reservation.guests = request.guests
+        reservation.payload = request.payload
+        reservation.status = resolveUpdatedStatus(previousStatus, request.status, event.approvalRequired)
 
         when (reservation.status) {
             ReservationStatus.ACCEPTED -> addGuestParticipant(occurrence, userId)
@@ -134,7 +123,42 @@ class ReservationService(
             }
             else -> {}
         }
-        return reservationRepository.save(reservation).toDto(eventId)
+        return reservationRepository.saveAndFlush(reservation).toDto(eventId)
+    }
+
+    private fun assertNonAdminMayChangeStatus(
+        isAdmin: Boolean,
+        currentStatus: ReservationStatus?,
+        requestedStatus: ReservationStatus,
+    ) {
+        if (isAdmin) return
+        val allowed = when (requestedStatus) {
+            ReservationStatus.WITHDREW -> true
+            ReservationStatus.PENDING ->
+                currentStatus == ReservationStatus.WITHDREW ||
+                    currentStatus == ReservationStatus.DENIED
+            else -> false
+        }
+        if (!allowed) {
+            throw ReservationStatusChangeAccessDeniedException()
+        }
+    }
+
+    private fun resolveUpdatedStatus(
+        previousStatus: ReservationStatus?,
+        requestedStatus: ReservationStatus,
+        approvalRequired: Boolean,
+    ): ReservationStatus {
+        val isReRequest =
+            requestedStatus == ReservationStatus.PENDING &&
+                (
+                    previousStatus == ReservationStatus.WITHDREW ||
+                        previousStatus == ReservationStatus.DENIED
+                    )
+        if (isReRequest && !approvalRequired) {
+            return ReservationStatus.ACCEPTED
+        }
+        return requestedStatus
     }
 
     private fun addGuestParticipant(occurrence: EventOccurrence, userId: UUID) {
