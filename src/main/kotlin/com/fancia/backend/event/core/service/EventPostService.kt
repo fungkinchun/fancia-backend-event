@@ -5,9 +5,13 @@ import com.fancia.backend.event.external.CommonInternalClient
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.CreatePostRequest
+import com.fancia.backend.shared.common.post.core.dto.PostMediaItem
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
 import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
+import com.fancia.backend.shared.upload.storage.core.enums.UploadScope
+import com.fancia.backend.shared.upload.storage.core.service.FileStorageService
+import com.fancia.backend.shared.upload.storage.core.service.moveTmpToDedicatedPath
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.security.oauth2.jwt.Jwt
@@ -19,6 +23,7 @@ class EventPostService(
     private val eventRepository: EventRepository,
     private val eventOccurrenceService: EventOccurrenceService,
     private val commonInternalClient: CommonInternalClient,
+    private val fileUploadService: FileStorageService,
 ) {
     fun create(
         eventId: UUID,
@@ -34,7 +39,7 @@ class EventPostService(
                 targetId = occurrenceId,
                 authorUserId = currentUserId,
                 body = request.body,
-                media = request.media,
+                media = dedicateMedia(request.media, occurrenceId),
                 featured = request.featured,
                 pinned = request.pinned,
             ),
@@ -51,7 +56,10 @@ class EventPostService(
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
         validateOccurrence(eventId, occurrenceId)
-        val post = commonInternalClient.updatePost(postId, request)
+        val post = commonInternalClient.updatePost(
+            postId,
+            request.copy(media = dedicateMedia(request.media, occurrenceId)),
+        )
         if (post.targetId != occurrenceId) {
             throw EventNotFoundException(eventId)
         }
@@ -92,4 +100,15 @@ class EventPostService(
         }
         eventOccurrenceService.getOccurrence(eventId, occurrenceId)
     }
+
+    private fun dedicateMedia(media: List<PostMediaItem>, occurrenceId: UUID): List<PostMediaItem> =
+        media.map { item ->
+            item.copy(
+                objectKey = fileUploadService.moveTmpToDedicatedPath(
+                    item.objectKey,
+                    UploadScope.EVENT,
+                    occurrenceId,
+                ),
+            )
+        }
 }
