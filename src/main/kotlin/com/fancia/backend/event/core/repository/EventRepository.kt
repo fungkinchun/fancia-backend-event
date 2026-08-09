@@ -1,16 +1,32 @@
 package com.fancia.backend.event.core.repository
 
 import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import java.time.LocalDateTime
 import java.util.*
 
 @Repository
 interface EventRepository : JpaRepository<Event, UUID> {
+    @Query(
+        """
+    SELECT e
+    FROM Event e
+    WHERE e.recurrenceFrequency = :frequency
+      AND e.startTime < :now
+""",
+    )
+    fun findPastOneTime(
+        @Param("now") now: LocalDateTime,
+        @Param("frequency") frequency: RecurrenceFrequency,
+        pageable: Pageable,
+    ): Page<Event>
+
     @Query(
         """
     SELECT e

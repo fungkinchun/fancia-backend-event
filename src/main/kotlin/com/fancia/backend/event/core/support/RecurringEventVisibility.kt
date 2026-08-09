@@ -55,6 +55,13 @@ object RecurringEventVisibility {
         }
     }
 
+    /** One-time events whose start is strictly before [now]. Recurring events are never "past" as a series. */
+    fun isPastListable(event: Event, now: LocalDateTime): Boolean {
+        if (isPauseActive(event, now)) return false
+        val anchorStart = event.startTime ?: return false
+        return event.recurrenceFrequency == RecurrenceFrequency.NONE && anchorStart.isBefore(now)
+    }
+
     fun nextOccurrenceStart(event: Event, now: LocalDateTime): LocalDateTime? {
         if (!isListable(event, now)) return null
         val anchorStart = event.startTime ?: return null

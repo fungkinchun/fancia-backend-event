@@ -610,6 +610,16 @@ class EventControllerIntegrationTest(
                 jsonPath("$.content[0].id", `is`(upcomingEvent.id.toString()))
             }
 
+        mockMvc
+            .get("/api/events?past=true&tagIds=$tagId&page=0&size=10") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content.length()", `is`(1))
+                jsonPath("$.content[0].id", `is`(pastEvent.id.toString()))
+            }
+
         val mine = mockMvc
             .get("/api/events?userId=$testUserId&page=0&size=10") {
                 with(jwtFor(testUserId))

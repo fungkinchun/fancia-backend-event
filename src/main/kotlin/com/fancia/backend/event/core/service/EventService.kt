@@ -30,6 +30,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -132,6 +133,7 @@ class EventService(
         match: Boolean,
         schedule: Boolean,
         userId: UUID?,
+        past: Boolean,
         jwt: Jwt?,
         pageable: Pageable,
     ): Page<EventResponse> {
@@ -170,6 +172,7 @@ class EventService(
                 eventRepository.findNearby(latitude, longitude, radiusMeters, browseFetchPageable(pageable)).content,
                 interestGroupId,
                 pageable,
+                past,
             ).map { event ->
                 val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
                 event.toDto(nextOccurrence)
@@ -181,6 +184,17 @@ class EventService(
         val hasTagIds = !tagIds.isNullOrEmpty()
         val fetchPageable = browseFetchPageable(pageable)
         val events = when {
+            past && !hasText && !hasTagIds ->
+                eventRepository.findPastOneTime(
+                    LocalDateTime.now(),
+                    RecurrenceFrequency.NONE,
+                    PageRequest.of(
+                        fetchPageable.pageNumber,
+                        fetchPageable.pageSize,
+                        Sort.by(Sort.Direction.DESC, "startTime"),
+                    ),
+                )
+
             !hasText && !hasTagIds ->
                 eventRepository.findAll(fetchPageable)
 
@@ -196,7 +210,7 @@ class EventService(
                     fetchPageable,
                 )
         }
-        return paginateDiscoverable(events.content, interestGroupId, pageable)
+        return paginateDiscoverable(events.content, interestGroupId, pageable, past)
             .map { event ->
                 val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
                 event.toDto(nextOccurrence)
@@ -211,10 +225,22 @@ class EventService(
         candidates: List<Event>,
         interestGroupId: UUID?,
         pageable: Pageable,
+        past: Boolean = false,
     ): Page<Event> {
         val now = LocalDateTime.now()
         val filtered = candidates.filter {
-            isDiscoverable(it, interestGroupId) && isVisibleInBrowseList(it, now)
+            isDiscoverable(it, interestGroupId) &&
+                if (past) {
+                    RecurringEventVisibility.isPastListable(it, now)
+                } else {
+                    isVisibleInBrowseList(it, now)
+                }
+        }.let { list ->
+            if (past) {
+                list.sortedByDescending { it.startTime }
+            } else {
+                list
+            }
         }
         val paged = filtered
             .drop(pageable.offset.toInt())

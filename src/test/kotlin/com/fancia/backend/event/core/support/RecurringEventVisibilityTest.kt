@@ -121,6 +121,27 @@ class RecurringEventVisibilityTest : FunSpec({
         RecurringEventVisibility.isListable(event, now) shouldBe true
     }
 
+    test("one-time past event is past-listable and not upcoming-listable") {
+        val event = Event().apply {
+            startTime = LocalDateTime.of(2020, 6, 1, 10, 0)
+            recurrenceFrequency = RecurrenceFrequency.NONE
+        }
+        val now = LocalDateTime.of(2024, 1, 1, 12, 0)
+
+        RecurringEventVisibility.isListable(event, now) shouldBe false
+        RecurringEventVisibility.isPastListable(event, now) shouldBe true
+    }
+
+    test("recurring event is never past-listable") {
+        val event = Event().apply {
+            startTime = LocalDateTime.of(2020, 6, 1, 10, 0)
+            recurrenceFrequency = RecurrenceFrequency.DAILY
+        }
+        val now = LocalDateTime.of(2024, 1, 1, 12, 0)
+
+        RecurringEventVisibility.isPastListable(event, now) shouldBe false
+    }
+
     test("recurring event is not listable while pause is active") {
         val anchorStart = LocalDateTime.of(2030, 6, 3, 10, 0)
         val event = Event().apply {
