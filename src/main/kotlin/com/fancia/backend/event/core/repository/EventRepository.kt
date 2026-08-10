@@ -17,6 +17,19 @@ interface EventRepository : JpaRepository<Event, UUID> {
         """
     SELECT e
     FROM Event e
+    WHERE e.startTime < :now
+""",
+    )
+    fun findStartedBefore(
+        @Param("now") now: LocalDateTime,
+        pageable: Pageable,
+    ): Page<Event>
+
+    @Deprecated("Use findStartedBefore — past browse includes recurring series that have started")
+    @Query(
+        """
+    SELECT e
+    FROM Event e
     WHERE e.recurrenceFrequency = :frequency
       AND e.startTime < :now
 """,

@@ -72,7 +72,7 @@ class EventController(
     @GetMapping
     @Operation(
         summary = "List events",
-        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link. Supports proximity search when lat/lng are provided. With match=true or schedule=true, returns upcoming events ranked by interest relevance (exact and similar tags), blacklist exclusion, location, and schedule fit. With past=true, returns finished one-time discoverable events (ignored for match/schedule and userId).",
+        description = "Returns a paginated list of discoverable events. Public events are listed globally; group events appear when filtered by interest group. Private events are excluded and only accessible via direct link. Supports proximity search when lat/lng are provided. With match=true or schedule=true, returns upcoming events ranked by interest relevance (exact and similar tags), blacklist exclusion, location, and schedule fit. With past=true, returns events that have already started (including recurring series with a past occurrence); those series still appear in the default upcoming list when they have future occurrences.",
     )
     @ApiResponses(
         value = [
@@ -116,7 +116,7 @@ class EventController(
         @Parameter(description = "List events the user hosts or attends (includes past). Hidden unless privacy.showEvents is explicitly true, except when the viewer is that user.")
         userId: UUID?,
         @RequestParam(name = "past", defaultValue = "false")
-        @Parameter(description = "When true, list finished one-time discoverable events instead of upcoming. Ignored when userId, match, or schedule is set.")
+        @Parameter(description = "When true, list discoverable events that have already started (one-time finished or recurring series with at least one past occurrence). Recurring series with future occurrences also appear in the default upcoming list. Ignored when userId, match, or schedule is set.")
         past: Boolean,
         @AuthenticationPrincipal jwt: Jwt?,
         @PageableDefault(size = 20)

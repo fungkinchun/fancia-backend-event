@@ -61,6 +61,15 @@ class EventOccurrenceService(
         ) ?: eventOccurrenceRepository.findFirstByEventIdAndStatusOrderByStartTimeAsc(event.id!!)
     }
 
+    /** Most recent occurrence that started before [now], if any. */
+    fun findLatestPast(event: Event, now: LocalDateTime): EventOccurrence? {
+        val eventId = event.id ?: return null
+        return eventOccurrenceRepository.findFirstByEventIdAndStartTimeLessThanAndStatusOrderByStartTimeDesc(
+            eventId,
+            now,
+        )
+    }
+
     @Transactional
     fun ensureUpcomingOccurrences(event: Event, now: LocalDateTime) {
         if (event.recurrenceFrequency == RecurrenceFrequency.NONE) return

@@ -168,26 +168,24 @@ class EventService(
 
         if (latitude != null && longitude != null) {
             val radiusMeters = radiusKm * 1000
+            val now = LocalDateTime.now()
             return paginateDiscoverable(
                 eventRepository.findNearby(latitude, longitude, radiusMeters, browseFetchPageable(pageable)).content,
                 interestGroupId,
                 pageable,
                 past,
-            ).map { event ->
-                val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
-                event.toDto(nextOccurrence)
-            }
+            ).map { event -> toBrowseDto(event, now, past) }
         }
         val trimmedName = name?.trim().orEmpty()
         val trimmedDescription = description?.trim().orEmpty()
         val hasText = trimmedName.isNotEmpty() || trimmedDescription.isNotEmpty()
         val hasTagIds = !tagIds.isNullOrEmpty()
         val fetchPageable = browseFetchPageable(pageable)
+        val now = LocalDateTime.now()
         val events = when {
             past && !hasText && !hasTagIds ->
-                eventRepository.findPastOneTime(
-                    LocalDateTime.now(),
-                    RecurrenceFrequency.NONE,
+                eventRepository.findStartedBefore(
+                    now,
                     PageRequest.of(
                         fetchPageable.pageNumber,
                         fetchPageable.pageSize,
@@ -211,10 +209,16 @@ class EventService(
                 )
         }
         return paginateDiscoverable(events.content, interestGroupId, pageable, past)
-            .map { event ->
-                val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
-                event.toDto(nextOccurrence)
-            }
+            .map { event -> toBrowseDto(event, now, past) }
+    }
+
+    private fun toBrowseDto(event: Event, now: LocalDateTime, past: Boolean): EventResponse {
+        val occurrence = if (past) {
+            eventOccurrenceService.findLatestPast(event, now)
+        } else {
+            eventOccurrenceService.findNextUpcoming(event, now)
+        }
+        return event.toDto(occurrence)
     }
 
     private fun browseFetchPageable(pageable: Pageable): Pageable {

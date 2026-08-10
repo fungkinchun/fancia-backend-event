@@ -20,6 +20,12 @@ interface EventOccurrenceRepository : JpaRepository<EventOccurrence, UUID> {
 
     fun existsByEventIdAndStartTime(eventId: UUID, startTime: LocalDateTime): Boolean
 
+    fun findFirstByEventIdAndStartTimeLessThanAndStatusOrderByStartTimeDesc(
+        eventId: UUID,
+        before: LocalDateTime,
+        status: OccurrenceStatus = OccurrenceStatus.SCHEDULED,
+    ): EventOccurrence?
+
     fun findFirstByEventIdAndStartTimeGreaterThanEqualAndStatusOrderByStartTimeAsc(
         eventId: UUID,
         from: LocalDateTime,

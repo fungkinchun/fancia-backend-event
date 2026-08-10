@@ -62,12 +62,25 @@ class RecurringEventVisibilityTest : FunSpec({
         }
     }
 
-    test("daily event is listable before today's start time and filtered after") {
+    test("daily slot helper is true before today's start time and false after") {
         val anchorStart = LocalDateTime.of(2020, 1, 1, 10, 0)
 
         RecurringEventVisibility.isDailyListable(anchorStart, LocalDateTime.of(2030, 5, 25, 9, 0)) shouldBe true
         RecurringEventVisibility.isDailyListable(anchorStart, LocalDateTime.of(2030, 5, 25, 10, 0)) shouldBe true
         RecurringEventVisibility.isDailyListable(anchorStart, LocalDateTime.of(2030, 5, 25, 10, 1)) shouldBe false
+    }
+
+    test("daily series stays listable after today's slot and advances to tomorrow") {
+        val event = Event().apply {
+            startTime = LocalDateTime.of(2020, 1, 1, 10, 0)
+            endTime = LocalDateTime.of(2020, 1, 1, 11, 0)
+            recurrenceFrequency = RecurrenceFrequency.DAILY
+        }
+        val now = LocalDateTime.of(2030, 5, 25, 10, 1)
+
+        RecurringEventVisibility.isListable(event, now) shouldBe true
+        RecurringEventVisibility.isPastListable(event, now) shouldBe true
+        RecurringEventVisibility.nextOccurrenceStart(event, now) shouldBe LocalDateTime.of(2030, 5, 26, 10, 0)
     }
 
     test("weekly event stays listable after this week's recurrence day has passed") {
@@ -84,6 +97,34 @@ class RecurringEventVisibilityTest : FunSpec({
             mondayOnly,
             LocalDateTime.of(2030, 6, 5, 9, 0),
         ) shouldBe true
+    }
+
+    test("weekly Sunday series is both past and upcoming after today's slot ends") {
+        val event = Event().apply {
+            startTime = LocalDateTime.of(2026, 8, 9, 12, 0)
+            endTime = LocalDateTime.of(2026, 8, 9, 14, 0)
+            recurrenceFrequency = RecurrenceFrequency.WEEKLY
+            recurrenceDaysMask = RecurrenceDaysMask.fromDayOfWeekSet(setOf(DayOfWeek.SUNDAY)).bits
+        }
+        val now = LocalDateTime.of(2026, 8, 9, 21, 0)
+
+        RecurringEventVisibility.isListable(event, now) shouldBe true
+        RecurringEventVisibility.isPastListable(event, now) shouldBe true
+        RecurringEventVisibility.nextOccurrenceStart(event, now) shouldBe LocalDateTime.of(2026, 8, 16, 12, 0)
+    }
+
+    test("weekly series not yet started is upcoming only") {
+        val event = Event().apply {
+            startTime = LocalDateTime.of(2026, 8, 16, 12, 0)
+            endTime = LocalDateTime.of(2026, 8, 16, 14, 0)
+            recurrenceFrequency = RecurrenceFrequency.WEEKLY
+            recurrenceDaysMask = RecurrenceDaysMask.fromDayOfWeekSet(setOf(DayOfWeek.SUNDAY)).bits
+        }
+        val now = LocalDateTime.of(2026, 8, 9, 21, 0)
+
+        RecurringEventVisibility.isListable(event, now) shouldBe true
+        RecurringEventVisibility.isPastListable(event, now) shouldBe false
+        RecurringEventVisibility.nextOccurrenceStart(event, now) shouldBe LocalDateTime.of(2026, 8, 16, 12, 0)
     }
 
     test("weekly event stays listable when another recurrence day is still upcoming this week") {
@@ -132,14 +173,15 @@ class RecurringEventVisibilityTest : FunSpec({
         RecurringEventVisibility.isPastListable(event, now) shouldBe true
     }
 
-    test("recurring event is never past-listable") {
+    test("recurring event that has started is past-listable") {
         val event = Event().apply {
             startTime = LocalDateTime.of(2020, 6, 1, 10, 0)
             recurrenceFrequency = RecurrenceFrequency.DAILY
         }
         val now = LocalDateTime.of(2024, 1, 1, 12, 0)
 
-        RecurringEventVisibility.isPastListable(event, now) shouldBe false
+        RecurringEventVisibility.isPastListable(event, now) shouldBe true
+        RecurringEventVisibility.isListable(event, now) shouldBe true
     }
 
     test("recurring event is not listable while pause is active") {
