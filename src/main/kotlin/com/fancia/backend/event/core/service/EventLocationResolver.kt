@@ -1,6 +1,6 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.event.core.support.EventLocationSupport
 import com.fancia.backend.event.external.VenueServiceClient
 import com.fancia.backend.shared.event.core.dto.EventLocationDto

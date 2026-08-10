@@ -1,6 +1,6 @@
 package com.fancia.backend.event.core.repository
 
-import com.fancia.backend.event.core.entity.EventOccurrence
+import com.fancia.backend.shared.event.core.entity.EventOccurrence
 import com.fancia.backend.shared.event.core.enums.OccurrenceStatus
 import com.fancia.backend.shared.event.core.enums.ReservationStatus
 import org.springframework.data.domain.Page
@@ -89,5 +89,5 @@ interface EventOccurrenceRepository : JpaRepository<EventOccurrence, UUID> {
     fun findEventsByUserInvolvement(
         @Param("userId") userId: UUID,
         pageable: Pageable,
-    ): Page<com.fancia.backend.event.core.entity.Event>
+    ): Page<com.fancia.backend.shared.event.core.entity.Event>
 }

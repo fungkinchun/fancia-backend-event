@@ -27,7 +27,7 @@ class EventOccurrenceController(
     private val eventOccurrenceService: EventOccurrenceService,
 ) {
     @GetMapping("/{eventId}/occurrences")
-    @Operation(summary = "List event occurrences")
+    @Operation(summary = "List event occurrences", description = "Returns persisted occurrences for the event only. Future recurring slots are not auto-materialized.")
     fun listOccurrences(
         @PathVariable eventId: UUID,
         @PageableDefault(size = 20) pageable: Pageable,

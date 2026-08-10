@@ -16,7 +16,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 )
 @EntityScan(
     basePackages = [
-        "com.fancia.backend.event.core",
+        "com.fancia.backend.shared.event.core.entity",
         "com.fancia.backend.shared.common.core.entity",
     ]
 )

@@ -1,6 +1,6 @@
 package com.fancia.backend.event.mapper
 
-import com.fancia.backend.event.core.entity.EventOccurrence
+import com.fancia.backend.shared.event.core.entity.EventOccurrence
 import com.fancia.backend.shared.event.core.dto.EventOccurrenceResponse
 
 fun EventOccurrence.toDto(): EventOccurrenceResponse {

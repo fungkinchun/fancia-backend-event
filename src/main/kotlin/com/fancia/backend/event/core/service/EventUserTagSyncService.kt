@@ -1,6 +1,6 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest

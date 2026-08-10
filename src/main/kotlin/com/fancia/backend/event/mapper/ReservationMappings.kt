@@ -1,7 +1,7 @@
 package com.fancia.backend.event.mapper
 
-import com.fancia.backend.event.core.entity.Reservation
-import com.fancia.backend.event.core.entity.ReservationId
+import com.fancia.backend.shared.event.core.entity.Reservation
+import com.fancia.backend.shared.event.core.entity.ReservationId
 import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
 import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest

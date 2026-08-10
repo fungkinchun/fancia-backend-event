@@ -1,7 +1,7 @@
 package com.fancia.backend.event.core.repository
 
-import com.fancia.backend.event.core.entity.EventParticipant
-import com.fancia.backend.event.core.entity.EventParticipantId
+import com.fancia.backend.shared.event.core.entity.EventParticipant
+import com.fancia.backend.shared.event.core.entity.EventParticipantId
 import com.fancia.backend.shared.event.core.enums.EventRole
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

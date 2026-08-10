@@ -1,15 +1,14 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.support.BusyOccurrence
-import com.fancia.backend.event.core.support.RecurringEventVisibility
+import com.fancia.backend.shared.event.core.support.RecurringEventVisibility
 import com.fancia.backend.event.core.support.SmartMatchEventRanker
 import com.fancia.backend.event.core.support.SmartMatchPreferences
 import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.external.UserServiceClient
-import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.tag.core.dto.CreateTagsRequest
@@ -53,9 +52,7 @@ class EventService(
 
     fun findById(id: UUID): EventResponse {
         val event = eventRepository.findById(id).orElseThrow { EventNotFoundException(id) }
-        val now = LocalDateTime.now()
-        val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, now)
-        return event.toDto(nextOccurrence)
+        return eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
     }
 
     @Transactional
@@ -79,8 +76,7 @@ class EventService(
                 request.endTime,
                 currentUserId,
             )
-            val nextOccurrence = eventOccurrenceService.findNextUpcoming(savedEvent, LocalDateTime.now())
-            return savedEvent.toDto(nextOccurrence)
+            return eventOccurrenceService.toUpcomingResponse(savedEvent, LocalDateTime.now())
         }
     }
 
@@ -104,8 +100,7 @@ class EventService(
                 }
             },
         ).let { updated ->
-            val nextOccurrence = eventOccurrenceService.findNextUpcoming(updated, LocalDateTime.now())
-            updated.toDto(nextOccurrence)
+            eventOccurrenceService.toUpcomingResponse(updated, LocalDateTime.now())
         }
     }
 
@@ -144,8 +139,7 @@ class EventService(
             }
             return eventOccurrenceRepository.findEventsByUserInvolvement(userId, pageable)
                 .map { event ->
-                    val nextOccurrence = eventOccurrenceService.findNextUpcoming(event, LocalDateTime.now())
-                    event.toDto(nextOccurrence)
+                    eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
                 }
         }
 
@@ -213,12 +207,11 @@ class EventService(
     }
 
     private fun toBrowseDto(event: Event, now: LocalDateTime, past: Boolean): EventResponse {
-        val occurrence = if (past) {
-            eventOccurrenceService.findLatestPast(event, now)
+        return if (past) {
+            eventOccurrenceService.toPastResponse(event, now)
         } else {
-            eventOccurrenceService.findNextUpcoming(event, now)
+            eventOccurrenceService.toUpcomingResponse(event, now)
         }
-        return event.toDto(occurrence)
     }
 
     private fun browseFetchPageable(pageable: Pageable): Pageable {
@@ -297,8 +290,7 @@ class EventService(
             .drop(pageable.offset.toInt())
             .take(pageable.pageSize)
             .map { rankedEvent ->
-                val nextOccurrence = eventOccurrenceService.findNextUpcoming(rankedEvent.event, now)
-                rankedEvent.event.toDto(nextOccurrence)
+                eventOccurrenceService.toUpcomingResponse(rankedEvent.event, now)
             }
 
         return PageImpl(matched, pageable, ranked.size.toLong())
@@ -418,7 +410,6 @@ class EventService(
     }
 
     private fun isVisibleInBrowseList(event: Event, now: LocalDateTime): Boolean {
-        eventOccurrenceService.ensureUpcomingOccurrences(event, now)
         return RecurringEventVisibility.isListable(event, now)
     }
 

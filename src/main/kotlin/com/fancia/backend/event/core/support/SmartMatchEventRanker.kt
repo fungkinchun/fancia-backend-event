@@ -1,9 +1,10 @@
 package com.fancia.backend.event.core.support
 
-import com.fancia.backend.event.core.entity.Event
 import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.shared.common.tag.core.dto.TagResponse
 import com.fancia.backend.shared.common.tag.core.enums.TagType
+import com.fancia.backend.shared.event.core.entity.Event
+import com.fancia.backend.shared.event.core.support.RecurringEventVisibility
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit

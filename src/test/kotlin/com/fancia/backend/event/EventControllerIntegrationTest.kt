@@ -1,6 +1,6 @@
 package com.fancia.backend.event
 
-import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.mapper.toEntity

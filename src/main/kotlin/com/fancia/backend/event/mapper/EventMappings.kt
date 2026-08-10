@@ -1,8 +1,8 @@
 package com.fancia.backend.event.mapper
 
-import com.fancia.backend.event.core.entity.Event
-import com.fancia.backend.event.core.entity.EventOccurrence
-import com.fancia.backend.event.core.entity.EventParticipant
+import com.fancia.backend.shared.event.core.entity.Event
+import com.fancia.backend.shared.event.core.entity.EventOccurrence
+import com.fancia.backend.shared.event.core.entity.EventParticipant
 import com.fancia.backend.event.core.support.EventLocationSupport
 import com.fancia.backend.shared.common.social.core.dto.LinkItem
 import com.fancia.backend.shared.common.social.core.dto.LinkResponse

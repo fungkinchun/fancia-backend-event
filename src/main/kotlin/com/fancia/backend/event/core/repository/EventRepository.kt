@@ -1,6 +1,6 @@
 package com.fancia.backend.event.core.repository
 
-import com.fancia.backend.event.core.entity.Event
+import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

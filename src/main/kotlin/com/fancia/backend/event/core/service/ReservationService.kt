@@ -1,9 +1,9 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.entity.EventOccurrence
-import com.fancia.backend.event.core.entity.EventParticipant
-import com.fancia.backend.event.core.entity.EventParticipantId
-import com.fancia.backend.event.core.entity.ReservationId
+import com.fancia.backend.shared.event.core.entity.EventOccurrence
+import com.fancia.backend.shared.event.core.entity.EventParticipant
+import com.fancia.backend.shared.event.core.entity.EventParticipantId
+import com.fancia.backend.shared.event.core.entity.ReservationId
 import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
