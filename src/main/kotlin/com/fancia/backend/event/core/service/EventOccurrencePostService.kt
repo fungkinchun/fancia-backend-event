@@ -18,23 +18,26 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import java.util.*
 
-/**
- * Posts whose [targetId] is the **event** id (featured post = cover / album).
- * Occurrence wall posts stay on [EventOccurrencePostService].
- */
+/** Posts on an occurrence wall ([targetId] = occurrence id). */
 @Service
-class EventPostService(
+class EventOccurrencePostService(
     private val eventRepository: EventRepository,
+    private val eventOccurrenceService: EventOccurrenceService,
     private val commonInternalClient: CommonInternalClient,
     private val fileUploadService: FileStorageService,
 ) {
-    fun create(eventId: UUID, request: CreatePostBody, jwt: Jwt): PostResponse {
+    fun create(
+        eventId: UUID,
+        occurrenceId: UUID,
+        request: CreatePostBody,
+        jwt: Jwt,
+    ): PostResponse {
         val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        requireEvent(eventId)
+        validateOccurrence(eventId, occurrenceId)
         return commonInternalClient.createPost(
             CreatePostRequest(
-                targetId = eventId,
+                targetId = occurrenceId,
                 authorUserId = currentUserId,
                 body = request.body,
                 media = dedicateMedia(request.media, eventId),
@@ -44,52 +47,59 @@ class EventPostService(
         )
     }
 
-    fun update(eventId: UUID, postId: UUID, request: UpdatePostRequest, jwt: Jwt): PostResponse {
+    fun update(
+        eventId: UUID,
+        occurrenceId: UUID,
+        postId: UUID,
+        request: UpdatePostRequest,
+        jwt: Jwt,
+    ): PostResponse {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        requireEvent(eventId)
+        validateOccurrence(eventId, occurrenceId)
         val post = commonInternalClient.updatePost(
             postId,
             request.copy(media = dedicateMedia(request.media, eventId)),
         )
-        if (post.targetId != eventId) {
+        if (post.targetId != occurrenceId) {
             throw EventNotFoundException(eventId)
         }
         return post
     }
 
-    fun like(eventId: UUID, postId: UUID, jwt: Jwt) {
+    fun like(eventId: UUID, occurrenceId: UUID, postId: UUID, jwt: Jwt) {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        get(eventId, postId)
+        get(eventId, occurrenceId, postId)
         commonInternalClient.likePost(postId)
     }
 
-    fun unlike(eventId: UUID, postId: UUID, jwt: Jwt) {
+    fun unlike(eventId: UUID, occurrenceId: UUID, postId: UUID, jwt: Jwt) {
         jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
             ?: throw InvalidAuthenticationException()
-        get(eventId, postId)
+        get(eventId, occurrenceId, postId)
         commonInternalClient.unlikePost(postId)
     }
 
-    fun list(eventId: UUID, pageable: Pageable): Page<PostResponse> {
-        requireEvent(eventId)
-        return commonInternalClient.listPosts(eventId, pageable)
+    fun list(eventId: UUID, occurrenceId: UUID, pageable: Pageable): Page<PostResponse> {
+        validateOccurrence(eventId, occurrenceId)
+        return commonInternalClient.listPosts(occurrenceId, pageable)
     }
 
-    fun get(eventId: UUID, postId: UUID): PostResponse {
-        requireEvent(eventId)
+    fun get(eventId: UUID, occurrenceId: UUID, postId: UUID): PostResponse {
+        validateOccurrence(eventId, occurrenceId)
         val post = commonInternalClient.getPost(postId)
-        if (post.targetId != eventId) {
+        if (post.targetId != occurrenceId) {
             throw EventNotFoundException(eventId)
         }
         return post
     }
 
-    private fun requireEvent(eventId: UUID) {
+    private fun validateOccurrence(eventId: UUID, occurrenceId: UUID) {
         if (!eventRepository.existsById(eventId)) {
             throw EventNotFoundException(eventId)
         }
+        eventOccurrenceService.getOccurrence(eventId, occurrenceId)
     }
 
     private fun dedicateMedia(media: List<PostMediaItem>, eventId: UUID): List<PostMediaItem> =
