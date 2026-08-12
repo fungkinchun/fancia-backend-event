@@ -16,7 +16,6 @@ import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventRecurrenceDto
 import com.fancia.backend.shared.event.core.dto.EventResponse
-import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
 import com.fancia.backend.shared.event.core.enums.EventVisibility
 import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import com.fancia.backend.shared.event.core.enums.ReservationStatus
@@ -433,6 +432,6 @@ class EventService(
     private fun canViewUserEvents(targetUserId: UUID, viewerId: UUID?): Boolean {
         if (viewerId == targetUserId) return true
         val user = runCatching { userServiceClient.getUser(targetUserId) }.getOrNull() ?: return false
-        return user.privacy.showEvents == true
+        return user.privacy.showEvents
     }
 }

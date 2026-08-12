@@ -659,7 +659,7 @@ class EventControllerIntegrationTest(
         response.content shouldBe emptyList()
     }
 
-    test("should hide another user's events when showEvents privacy is unset") {
+    test("should show another user's events when showEvents privacy is unset") {
         preparePersonalizedTest()
         stubUser(testUserId, showEvents = null)
         val tagId = stubCreateTag("unset-events")
@@ -679,11 +679,11 @@ class EventControllerIntegrationTest(
             }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.content.length()", `is`(0))
+                jsonPath("$.content.length()", `is`(1))
             }
             .toEventPage(jsonMapper)
 
-        response.content shouldBe emptyList()
+        response.content.size shouldBe 1
     }
 
     afterSpec {
