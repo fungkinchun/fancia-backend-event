@@ -433,6 +433,7 @@ class EventService(
     private fun canViewUserEvents(targetUserId: UUID, viewerId: UUID?): Boolean {
         if (viewerId == targetUserId) return true
         val user = runCatching { userServiceClient.getUser(targetUserId) }.getOrNull() ?: return false
-        return user.privacy.showEvents
+        // ProfileResponse applies privacy: null eventsCount means section hidden.
+        return user.eventsCount != null
     }
 }

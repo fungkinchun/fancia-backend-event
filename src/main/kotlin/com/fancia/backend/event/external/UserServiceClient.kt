@@ -2,6 +2,7 @@ package com.fancia.backend.event.external
 
 import com.fancia.backend.event.config.FeignConfig
 import com.fancia.backend.shared.user.core.dto.UpdateUserRequest
+import com.fancia.backend.shared.user.core.dto.ProfileResponse
 import com.fancia.backend.shared.user.core.dto.UserResponse
 import org.springframework.cloud.openfeign.FeignClient
 import org.springframework.web.bind.annotation.GetMapping
@@ -20,7 +21,7 @@ interface UserServiceClient {
     fun getCurrentUser(): UserResponse
 
     @GetMapping("/{id}")
-    fun getUser(@PathVariable id: UUID): UserResponse
+    fun getUser(@PathVariable id: UUID): ProfileResponse
 
     @PutMapping
     fun updateUser(@RequestBody request: UpdateUserRequest): UserResponse

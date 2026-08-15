@@ -97,10 +97,10 @@ class EventControllerIntegrationTest(
     }
 
     fun stubUser(userId: UUID, showEvents: Boolean? = true) {
-        val privacyBody = if (showEvents == null) {
-            emptyMap<String, Any>()
-        } else {
-            mapOf("showEvents" to showEvents)
+        // ProfileResponse: non-null eventsCount = visible; omit = hidden.
+        val body = mutableMapOf<String, Any>("id" to userId.toString())
+        if (showEvents != false) {
+            body["eventsCount"] = 0
         }
         stubFor(
             get(urlPathEqualTo("/api/users/$userId"))
@@ -108,14 +108,7 @@ class EventControllerIntegrationTest(
                     aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(
-                            jsonMapper.writeValueAsString(
-                                mapOf(
-                                    "id" to userId.toString(),
-                                    "privacy" to privacyBody,
-                                ),
-                            ),
-                        ),
+                        .withBody(jsonMapper.writeValueAsString(body)),
                 ),
         )
     }
