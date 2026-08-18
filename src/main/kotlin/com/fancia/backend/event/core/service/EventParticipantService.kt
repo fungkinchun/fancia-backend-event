@@ -5,6 +5,7 @@ import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.shared.event.core.dto.EventParticipantResponse
+import com.fancia.backend.shared.event.core.enums.EventRole
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import com.fancia.backend.shared.event.core.exception.OccurrenceNotFoundException
 import org.springframework.data.domain.Page
@@ -22,13 +23,18 @@ class EventParticipantService(
     fun findParticipants(
         eventId: UUID,
         occurrenceId: UUID,
+        role: EventRole?,
         pageable: Pageable,
     ): Page<EventParticipantResponse> {
         eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
         eventOccurrenceRepository.findByIdAndEventId(occurrenceId, eventId)
             ?: throw OccurrenceNotFoundException(eventId, occurrenceId)
 
-        return eventParticipantRepository.findByIdOccurrenceId(occurrenceId, pageable)
-            .map { it.toDto() }
+        val page = if (role == null) {
+            eventParticipantRepository.findByIdOccurrenceId(occurrenceId, pageable)
+        } else {
+            eventParticipantRepository.findByIdOccurrenceIdAndRole(occurrenceId, role, pageable)
+        }
+        return page.map { it.toDto() }
     }
 }

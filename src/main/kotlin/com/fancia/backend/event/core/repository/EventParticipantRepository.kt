@@ -13,6 +13,12 @@ import java.util.UUID
 interface EventParticipantRepository : JpaRepository<EventParticipant, EventParticipantId> {
     fun findByIdOccurrenceId(occurrenceId: UUID, pageable: Pageable): Page<EventParticipant>
 
+    fun findByIdOccurrenceIdAndRole(
+        occurrenceId: UUID,
+        role: EventRole,
+        pageable: Pageable,
+    ): Page<EventParticipant>
+
     fun existsByIdOccurrenceIdAndIdUserIdAndRole(
         occurrenceId: UUID,
         userId: UUID,
