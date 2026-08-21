@@ -67,6 +67,10 @@ spring:
             url: ${USER_SERVICE_URL:#{null}}
           user-internal-service:
             url: ${USER_INTERNAL_SERVICE_URL:#{null}}
+          payment-service:
+            url: ${PAYMENT_SERVICE_URL:#{null}}
+          payment-internal-service:
+            url: ${PAYMENT_INTERNAL_SERVICE_URL:#{null}}
           venue-service:
             url: ${VENUE_SERVICE_URL:#{null}}
           venue-internal-service:
@@ -87,7 +91,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: com.fancia.backend.shared.user.core.message
+        spring.json.trusted.packages: com.fancia.backend.shared.user.core.message,com.fancia.backend.shared.payment.core.message
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:fancia-kafka-fancia.f.aivencloud.com:25067}
     properties:
       security.protocol: SSL

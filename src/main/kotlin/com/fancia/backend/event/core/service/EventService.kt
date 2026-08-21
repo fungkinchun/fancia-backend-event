@@ -346,9 +346,10 @@ class EventService(
 
     private fun findUpcomingCommitments(userId: UUID, from: LocalDateTime): List<BusyOccurrence> {
         val activeReservationStatuses = listOf(
+            ReservationStatus.PENDING,
+            ReservationStatus.PAID,
             ReservationStatus.ACCEPTED,
             ReservationStatus.WHITELIST,
-            ReservationStatus.PENDING,
         )
         val participantOccurrences = eventOccurrenceRepository.findUpcomingForParticipant(userId, from)
         val reservationOccurrences = eventOccurrenceRepository.findUpcomingForReservation(

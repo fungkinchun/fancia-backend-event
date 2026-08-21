@@ -4,6 +4,8 @@ import com.fancia.backend.shared.event.core.dto.ReservationResponse
 import com.fancia.backend.event.core.service.ReservationService
 import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
 import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
+import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutRequest
+import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
@@ -71,4 +73,14 @@ class ReservationController(
     ): ResponseEntity<ReservationResponse> {
         return ResponseEntity.ok(reservationService.update(eventId, occurrenceId, userId, request, jwt))
     }
+
+    @Operation(summary = "Start Stripe Checkout for a pending paid reservation")
+    @PostMapping("/{eventId}/occurrences/{occurrenceId}/reservations/checkout")
+    fun checkout(
+        @PathVariable eventId: UUID,
+        @PathVariable occurrenceId: UUID,
+        @RequestBody @Valid request: ConnectCheckoutRequest,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<ConnectCheckoutResponse> =
+        ResponseEntity.ok(reservationService.checkout(eventId, occurrenceId, request, jwt))
 }

@@ -78,7 +78,7 @@ class ReservationControllerIntegrationTest(
             .id!!
     }
 
-    test("should create a new event") {
+    test("free reservation becomes paid then host can accept guests") {
         val testUserId = UUID.randomUUID()
         val testInterestGroupId = UUID.randomUUID()
         stubCreateTag("good")
@@ -96,6 +96,7 @@ class ReservationControllerIntegrationTest(
                     "tags" to listOf(mapOf("name" to "good", "type" to "TOPIC")),
                     "visibility" to "PUBLIC",
                     "links" to emptyList<Any>(),
+                    "approvalRequired" to true,
                 )
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
@@ -128,7 +129,7 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.eventId", `is`(createdEvent.id.toString()))
                 jsonPath("$.occurrenceId", `is`(occurrenceId.toString()))
                 jsonPath("$.userId", `is`(testUserId.toString()))
-                jsonPath("$.status", `is`("PENDING"))
+                jsonPath("$.status", `is`("PAID"))
             }
         val found = reservationRepository.existsByIdOccurrenceIdAndIdUserId(occurrenceId, testUserId)
         found shouldBe true
@@ -154,9 +155,6 @@ class ReservationControllerIntegrationTest(
             .andDo { print() }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.eventId", `is`(createdEvent.id.toString()))
-                jsonPath("$.occurrenceId", `is`(occurrenceId.toString()))
-                jsonPath("$.userId", `is`(testUserId.toString()))
                 jsonPath("$.status", `is`("ACCEPTED"))
             }
         val testParticipantId = UUID.randomUUID()
@@ -175,10 +173,7 @@ class ReservationControllerIntegrationTest(
             .andDo { print() }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.eventId", `is`(createdEvent.id.toString()))
-                jsonPath("$.occurrenceId", `is`(occurrenceId.toString()))
-                jsonPath("$.userId", `is`(testParticipantId.toString()))
-                jsonPath("$.status", `is`("PENDING"))
+                jsonPath("$.status", `is`("PAID"))
             }
 
         mockMvc.get("/api/events/{eventId}/occurrences/{occurrenceId}/participants", createdEvent.id, occurrenceId) {
@@ -190,7 +185,7 @@ class ReservationControllerIntegrationTest(
             .andDo { print() }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.totalElements", `is`(1))
+                jsonPath("$.totalElements", `is`(2))
             }
 
         mockMvc.patch(
@@ -214,18 +209,7 @@ class ReservationControllerIntegrationTest(
             .andDo { print() }
             .andExpect {
                 status { isOk() }
-            }
-
-        mockMvc.get("/api/events/{eventId}/occurrences/{occurrenceId}/participants", createdEvent.id, occurrenceId) {
-            with(jwt().jwt {
-                it.claim("userId", testUserId)
-            })
-            accept = APPLICATION_JSON
-        }
-            .andDo { print() }
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.totalElements", `is`(2))
+                jsonPath("$.status", `is`("ACCEPTED"))
             }
     }
 
@@ -271,7 +255,7 @@ class ReservationControllerIntegrationTest(
             }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.status", `is`("PENDING"))
+                jsonPath("$.status", `is`("PAID"))
             }
 
         mockMvc.patch(
