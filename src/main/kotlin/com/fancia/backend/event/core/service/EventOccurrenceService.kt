@@ -52,7 +52,6 @@ class EventOccurrenceService(
             ?: throw OccurrenceNotFoundException(eventId, occurrenceId)
     }
 
-    /** Next persisted occurrence at or after [now], if any. Does not create rows. */
     fun findNextUpcoming(event: Event, now: LocalDateTime): EventOccurrence? {
         val eventId = event.id ?: return null
         return eventOccurrenceRepository.findFirstByEventIdAndStartTimeGreaterThanEqualAndStatusOrderByStartTimeAsc(
@@ -61,7 +60,6 @@ class EventOccurrenceService(
         )
     }
 
-    /** Most recent persisted occurrence that started before [now], if any. */
     fun findLatestPast(event: Event, now: LocalDateTime): EventOccurrence? {
         val eventId = event.id ?: return null
         return eventOccurrenceRepository.findFirstByEventIdAndStartTimeLessThanAndStatusOrderByStartTimeDesc(
@@ -70,11 +68,6 @@ class EventOccurrenceService(
         )
     }
 
-    /**
-     * Maps an event for upcoming browse/detail.
-     * Prefers a persisted upcoming occurrence; otherwise uses a computed next slot
-     * for display times only (does not insert an occurrence row).
-     */
     fun toUpcomingResponse(event: Event, now: LocalDateTime = LocalDateTime.now()): EventResponse {
         val next = findNextUpcoming(event, now)
         if (next != null) return event.toDto(next)

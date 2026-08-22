@@ -18,7 +18,6 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import java.util.*
 
-/** Posts on an occurrence wall ([targetId] = occurrence id). */
 @Service
 class EventOccurrencePostService(
     private val eventRepository: EventRepository,

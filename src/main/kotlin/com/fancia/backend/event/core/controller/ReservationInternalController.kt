@@ -3,6 +3,7 @@ package com.fancia.backend.event.core.controller
 import com.fancia.backend.event.core.service.ReservationService
 import com.fancia.backend.shared.event.core.dto.EventReservationCheckoutSnapshot
 import com.fancia.backend.shared.event.core.dto.ReservationResponse
+import com.fancia.backend.shared.payment.core.dto.ConfirmConnectCheckoutPaidRequest
 import io.swagger.v3.oas.annotations.Hidden
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.http.ResponseEntity
@@ -13,10 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
-
-data class ConfirmEventReservationPaidRequest(
-    val checkoutSessionId: String? = null,
-)
 
 @RestController
 @RequestMapping("/internal/events/{eventId}/occurrences/{occurrenceId}/reservations/{userId}")
@@ -39,7 +36,7 @@ class ReservationInternalController(
         @PathVariable eventId: UUID,
         @PathVariable occurrenceId: UUID,
         @PathVariable userId: UUID,
-        @RequestBody(required = false) request: ConfirmEventReservationPaidRequest?,
+        @RequestBody(required = false) request: ConfirmConnectCheckoutPaidRequest?,
     ): ResponseEntity<ReservationResponse> =
         ResponseEntity.ok(
             reservationService.confirmPaid(

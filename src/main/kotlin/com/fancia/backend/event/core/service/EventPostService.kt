@@ -18,10 +18,6 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import java.util.*
 
-/**
- * Posts whose [targetId] is the **event** id (featured post = cover / album).
- * Occurrence wall posts stay on [EventOccurrencePostService].
- */
 @Service
 class EventPostService(
     private val eventRepository: EventRepository,

@@ -12,7 +12,7 @@ import jakarta.persistence.Table
 @Entity
 @Table(name = "event_ticket_tiers")
 class EventTicketTier : AbstractEntity() {
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "event_id", nullable = false)
     var event: Event? = null
 

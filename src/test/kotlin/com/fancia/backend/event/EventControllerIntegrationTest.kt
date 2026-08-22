@@ -97,7 +97,6 @@ class EventControllerIntegrationTest(
     }
 
     fun stubUser(userId: UUID, showEvents: Boolean? = true) {
-        // ProfileResponse: non-null eventsCount = visible; omit = hidden.
         val body = mutableMapOf<String, Any>("id" to userId.toString())
         if (showEvents != false) {
             body["eventsCount"] = 0
