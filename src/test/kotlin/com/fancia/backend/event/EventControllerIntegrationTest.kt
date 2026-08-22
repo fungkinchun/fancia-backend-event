@@ -213,6 +213,7 @@ class EventControllerIntegrationTest(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.name", `is`("testEvent"))
+                jsonPath("$.slug", `is`("testevent"))
                 jsonPath("$.id", `is`(notNullValue()))
                 jsonPath("$.interestGroups[0]", `is`(testInterestGroupId.toString()))
             }
@@ -260,6 +261,46 @@ class EventControllerIntegrationTest(
                 status { isOk() }
                 jsonPath("$.id", `is`(eventId.toString()))
                 jsonPath("$.name", `is`("testEvent"))
+                jsonPath("$.slug", `is`("testevent"))
+            }
+    }
+
+    test("should get event by slug") {
+        val event = eventRepository.findAll().first { it.name == "testEvent" }
+        mockMvc
+            .get("/api/events/${event.slug}") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.id", `is`(event.id!!.toString()))
+                jsonPath("$.slug", `is`("testevent"))
+            }
+    }
+
+    test("should allocate unique slug on name collision") {
+        stubCreateTag("collision")
+        mockMvc
+            .post("/api/events") {
+                with(jwt().jwt { it.claim("userId", testUserId) })
+                content = jsonMapper.writeValueAsString(
+                    mapOf(
+                        "name" to "testEvent",
+                        "description" to "duplicate name",
+                        "startTime" to "2030-07-01T10:00:00",
+                        "endTime" to "2030-07-01T12:00:00",
+                        "interestGroups" to listOf(testInterestGroupId),
+                        "tags" to listOf(mapOf("name" to "collision", "type" to "TOPIC")),
+                        "visibility" to "PUBLIC",
+                        "links" to emptyList<Any>(),
+                    ),
+                )
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.slug", `is`("testevent-2"))
             }
     }
 

@@ -11,6 +11,7 @@ import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
+import com.fancia.backend.shared.common.core.utils.Slugify
 import com.fancia.backend.shared.common.tag.core.dto.CreateTagsRequest
 import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
@@ -55,6 +56,21 @@ class EventService(
         return eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
     }
 
+    fun findByIdOrSlug(ref: String): EventResponse {
+        val event = resolveByIdOrSlug(ref)
+        return eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
+    }
+
+    fun resolveByIdOrSlug(ref: String): Event {
+        val trimmed = ref.trim()
+        if (trimmed.isEmpty()) throw EventNotFoundException(ref)
+        val asUuid = runCatching { UUID.fromString(trimmed) }.getOrNull()
+        if (asUuid != null) {
+            return eventRepository.findById(asUuid).orElseThrow { EventNotFoundException(asUuid) }
+        }
+        return eventRepository.findBySlug(trimmed).orElseThrow { EventNotFoundException(trimmed) }
+    }
+
     @Transactional
     fun create(request: @Valid CreateEventRequest, jwt: Jwt): EventResponse {
         val currentUserId = jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
@@ -66,6 +82,7 @@ class EventService(
         request.toEntity().let {
             it.createdBy = currentUserId
             it.visibility = visibility
+            it.slug = allocateEventSlug(request.name)
             applyTags(it.tags, request.tags)
             eventLocationResolver.apply(it, request.location)
             applyRecurrence(it, request.recurrence)
@@ -386,6 +403,9 @@ class EventService(
         ).content.mapNotNull { it.id }
         tags.addAll(resolved)
     }
+
+    private fun allocateEventSlug(name: String): String =
+        Slugify.allocateUnique(name, fallback = "event") { eventRepository.existsBySlug(it) }
 
     private fun validateVisibility(visibility: EventVisibility, interestGroups: Set<UUID>) {
         if (visibility == EventVisibility.GROUP && interestGroups.isEmpty()) {

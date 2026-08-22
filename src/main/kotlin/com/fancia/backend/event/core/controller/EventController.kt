@@ -54,10 +54,10 @@ class EventController(
         return ResponseEntity.ok(eventService.update(id, request, jwt))
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{ref}")
     @Operation(
-        summary = "Get event by id",
-        description = "Returns an event by id. Private and group events are accessible via direct link."
+        summary = "Get event by id or slug",
+        description = "Returns an event by UUID or slug. Private and group events are accessible via direct link."
     )
     @ApiResponses(
         value = [
@@ -65,8 +65,8 @@ class EventController(
             ApiResponse(responseCode = "404", description = "Event not found"),
         ]
     )
-    fun getEvent(@PathVariable id: UUID): ResponseEntity<EventResponse> {
-        return ResponseEntity.ok(eventService.findById(id))
+    fun getEvent(@PathVariable ref: String): ResponseEntity<EventResponse> {
+        return ResponseEntity.ok(eventService.findByIdOrSlug(ref))
     }
 
     @GetMapping

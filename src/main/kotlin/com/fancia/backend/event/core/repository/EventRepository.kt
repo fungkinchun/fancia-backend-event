@@ -114,4 +114,8 @@ interface EventRepository : JpaRepository<Event, UUID> {
         @Param("radiusMeters") radiusMeters: Double,
         pageable: Pageable,
     ): Page<Event>
+
+    fun findBySlug(slug: String): Optional<Event>
+
+    fun existsBySlug(slug: String): Boolean
 }

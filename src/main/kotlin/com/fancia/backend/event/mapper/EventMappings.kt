@@ -15,6 +15,7 @@ fun Event.toDto(nextOccurrence: EventOccurrence? = null): EventResponse =
     EventResponse(
         id = this@toDto.id,
         name = this@toDto.name,
+        slug = this@toDto.slug,
         description = this@toDto.description,
         interestGroups = this@toDto.interestGroups,
         createdBy = this@toDto.createdBy,
@@ -54,6 +55,7 @@ fun EventResponse.toEntity(): Event =
     Event().apply {
         id = this@toEntity.id
         name = this@toEntity.name
+        slug = this@toEntity.slug
         description = this@toEntity.description
         interestGroups = this@toEntity.interestGroups.toMutableSet()
         createdBy = this@toEntity.createdBy
