@@ -127,3 +127,13 @@ management:
     prometheus:
       enabled: true
 
+# Temporary: diagnose Bearer JWT 401 on permitAll GETs (remove after fix)
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: TRACE
+    org.springframework.security.oauth2.server.resource: TRACE
+    org.springframework.security.oauth2.jwt: TRACE
+    com.nimbusds.jose: DEBUG
+    com.nimbusds.jwt: DEBUG
+
