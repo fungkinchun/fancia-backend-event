@@ -11,7 +11,10 @@ import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.shared.event.core.entity.Reservation
 import java.util.UUID
 
-fun Reservation.toDto(eventId: UUID): ReservationResponse =
+fun Reservation.toDto(
+    eventId: UUID,
+    includeCheckInToken: Boolean = false,
+): ReservationResponse =
     ReservationResponse(
         eventId = eventId,
         occurrenceId = id?.occurrenceId,
@@ -22,6 +25,8 @@ fun Reservation.toDto(eventId: UUID): ReservationResponse =
         tierId = tierId,
         priceMinor = priceMinor,
         currency = currency,
+        checkedInAt = checkedInAt,
+        checkInToken = if (includeCheckInToken) checkInToken else null,
     )
 
 fun CreateReservationRequest.toEntity(): Reservation =
@@ -46,6 +51,8 @@ fun EventTicketTier.toDto(): EventTicketTierResponse =
         priceMinor = priceMinor,
         currency = currency,
         capacityPerOccurrence = capacityPerOccurrence,
+        checkInBeforeMinutes = checkInBeforeMinutes,
+        checkInAfterMinutes = checkInAfterMinutes,
         sortOrder = sortOrder,
         createdBy = createdBy,
         createdAt = createdAt,
@@ -58,6 +65,8 @@ fun CreateEventTicketTierRequest.toEntity(event: Event): EventTicketTier =
         priceMinor = this@toEntity.priceMinor
         currency = this@toEntity.currency.trim().lowercase()
         capacityPerOccurrence = this@toEntity.capacityPerOccurrence
+        checkInBeforeMinutes = this@toEntity.checkInBeforeMinutes
+        checkInAfterMinutes = this@toEntity.checkInAfterMinutes
         sortOrder = this@toEntity.sortOrder
     }
 
@@ -66,6 +75,8 @@ fun UpdateEventTicketTierRequest.applyTo(tier: EventTicketTier): EventTicketTier
     priceMinor?.let { tier.priceMinor = it }
     currency?.let { tier.currency = it.trim().lowercase() }
     sortOrder?.let { tier.sortOrder = it }
+    checkInBeforeMinutes?.let { tier.checkInBeforeMinutes = it }
+    checkInAfterMinutes?.let { tier.checkInAfterMinutes = it }
     when {
         clearCapacity -> tier.capacityPerOccurrence = null
         capacityPerOccurrence != null -> tier.capacityPerOccurrence = capacityPerOccurrence

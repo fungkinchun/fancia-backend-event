@@ -28,6 +28,12 @@ class EventTicketTier : AbstractEntity() {
     @Column(name = "capacity_per_occurrence")
     var capacityPerOccurrence: Int? = null
 
+    @Column(name = "check_in_before_minutes", nullable = false)
+    var checkInBeforeMinutes: Int = 120
+
+    @Column(name = "check_in_after_minutes", nullable = false)
+    var checkInAfterMinutes: Int = 60
+
     @Column(name = "sort_order", nullable = false)
     var sortOrder: Int = 0
 }

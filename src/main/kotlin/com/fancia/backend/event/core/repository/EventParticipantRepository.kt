@@ -25,5 +25,11 @@ interface EventParticipantRepository : JpaRepository<EventParticipant, EventPart
         role: EventRole = EventRole.HOST,
     ): Boolean
 
+    fun existsByIdOccurrenceIdAndIdUserIdAndRoleIn(
+        occurrenceId: UUID,
+        userId: UUID,
+        roles: Collection<EventRole>,
+    ): Boolean
+
     fun existsByIdOccurrenceIdAndIdUserId(occurrenceId: UUID, userId: UUID): Boolean
 }

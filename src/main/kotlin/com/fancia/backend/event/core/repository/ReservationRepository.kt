@@ -25,6 +25,13 @@ interface ReservationRepository : JpaRepository<Reservation, ReservationId> {
         pageable: Pageable,
     ): Page<Reservation>
 
+    fun findByCheckInToken(checkInToken: String): Reservation?
+
+    fun findAllByIdOccurrenceIdAndStatus(
+        occurrenceId: UUID,
+        status: ReservationStatus,
+    ): List<Reservation>
+
     @Query(
         """
         select count(r) from Reservation r

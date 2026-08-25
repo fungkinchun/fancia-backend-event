@@ -4,6 +4,7 @@ import com.fancia.backend.event.core.repository.EventParticipantRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.EventTicketTierRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
+import com.fancia.backend.event.core.support.CheckInTokens
 import com.fancia.backend.event.external.PaymentInternalClient
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.event.mapper.toEntity
@@ -72,7 +73,7 @@ class ReservationService(
         ReservationStatus.WHITELIST,
     )
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun get(
         eventId: UUID,
         occurrenceId: UUID,
@@ -88,7 +89,11 @@ class ReservationService(
         }
         val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
             ?: throw ReservationNotFoundException(eventId, userId)
-        return reservation.toDto(eventId)
+        if (ensureCheckInToken(reservation)) {
+            reservationRepository.save(reservation)
+        }
+        val includeToken = currentUserId == userId && reservation.status == ReservationStatus.ACCEPTED
+        return reservation.toDto(eventId, includeCheckInToken = includeToken)
     }
 
     @Transactional(readOnly = true)
@@ -110,7 +115,7 @@ class ReservationService(
         } else {
             reservationRepository.findByIdOccurrenceId(occurrenceId, pageable)
         }
-        return page.map { it.toDto(eventId) }
+        return page.map { it.toDto(eventId, includeCheckInToken = false) }
     }
 
     @Transactional
@@ -125,7 +130,9 @@ class ReservationService(
             ?: throw EventNotFoundException(eventId)
         val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
         reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, currentUserId)?.let {
-            return it.toDto(eventId)
+            ensureCheckInToken(it)
+            val includeToken = it.status == ReservationStatus.ACCEPTED
+            return reservationRepository.save(it).toDto(eventId, includeCheckInToken = includeToken)
         }
 
         val reservation = request.toEntity()
@@ -154,7 +161,8 @@ class ReservationService(
         }
 
         val saved = reservationRepository.save(reservation)
-        return saved.toDto(eventId)
+        val includeToken = saved.status == ReservationStatus.ACCEPTED
+        return saved.toDto(eventId, includeCheckInToken = includeToken)
     }
 
     @Transactional
@@ -204,7 +212,10 @@ class ReservationService(
             else -> {}
         }
 
-        return reservationRepository.saveAndFlush(reservation).toDto(eventId)
+        syncCheckInToken(reservation)
+        val saved = reservationRepository.saveAndFlush(reservation)
+        val includeToken = currentUserId == userId && saved.status == ReservationStatus.ACCEPTED
+        return saved.toDto(eventId, includeCheckInToken = includeToken)
     }
 
     @Transactional(readOnly = true)
@@ -292,7 +303,8 @@ class ReservationService(
                 ReservationStatus.WHITELIST,
             )
         ) {
-            return reservation.toDto(eventId)
+            ensureCheckInToken(reservation)
+            return reservationRepository.save(reservation).toDto(eventId, includeCheckInToken = false)
         }
         if (reservation.status != ReservationStatus.PENDING) {
             throw ReservationStatusChangeAccessDeniedException()
@@ -305,7 +317,7 @@ class ReservationService(
         assertCapacityAvailable(occurrenceId, tierId, tier.capacityPerOccurrence)
 
         markPaid(reservation, occurrence, event, userId, checkoutSessionId)
-        return reservationRepository.save(reservation).toDto(eventId)
+        return reservationRepository.save(reservation).toDto(eventId, includeCheckInToken = false)
     }
 
     private fun markPaid(
@@ -323,6 +335,24 @@ class ReservationService(
         if (!event.approvalRequired) {
             reservation.status = ReservationStatus.ACCEPTED
         }
+        syncCheckInToken(reservation)
+    }
+
+    private fun syncCheckInToken(reservation: Reservation) {
+        if (reservation.status == ReservationStatus.ACCEPTED) {
+            if (reservation.checkInToken.isNullOrBlank()) {
+                reservation.checkInToken = CheckInTokens.generate()
+            }
+        } else {
+            reservation.checkInToken = null
+        }
+    }
+
+    private fun ensureCheckInToken(reservation: Reservation): Boolean {
+        if (reservation.status != ReservationStatus.ACCEPTED) return false
+        if (!reservation.checkInToken.isNullOrBlank()) return false
+        reservation.checkInToken = CheckInTokens.generate()
+        return true
     }
 
     private fun requireRefundIfNeeded(reservation: Reservation, previousStatus: ReservationStatus?) {
