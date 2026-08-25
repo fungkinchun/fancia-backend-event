@@ -25,6 +25,7 @@ import com.fancia.backend.shared.event.core.exception.EventTicketSoldOutExceptio
 import com.fancia.backend.shared.event.core.exception.EventTicketTierNotFoundException
 import com.fancia.backend.shared.event.core.exception.ReservationChangeDeniedException
 import com.fancia.backend.shared.event.core.exception.ReservationNotFoundException
+import com.fancia.backend.shared.event.core.exception.ReservationRefundFailedException
 import com.fancia.backend.shared.event.core.exception.ReservationStatusChangeAccessDeniedException
 import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutRequest
 import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutResponse
@@ -33,6 +34,8 @@ import com.fancia.backend.shared.payment.core.dto.RefundConnectCheckoutRequest
 import com.fancia.backend.shared.payment.core.enums.ConnectCheckoutPurpose
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
@@ -61,9 +64,6 @@ class ReservationService(
 
     private val withdrawableStatuses = setOf(
         ReservationStatus.PENDING,
-        ReservationStatus.PAID,
-        ReservationStatus.ACCEPTED,
-        ReservationStatus.WHITELIST,
     )
 
     private val refundableStatuses = setOf(
@@ -89,6 +89,28 @@ class ReservationService(
         val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
             ?: throw ReservationNotFoundException(eventId, userId)
         return reservation.toDto(eventId)
+    }
+
+    @Transactional(readOnly = true)
+    fun list(
+        eventId: UUID,
+        occurrenceId: UUID,
+        status: ReservationStatus?,
+        pageable: Pageable,
+        jwt: Jwt,
+    ): Page<ReservationResponse> {
+        val currentUserId = jwt.userId()
+        eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
+        eventOccurrenceService.getOccurrence(eventId, occurrenceId)
+        if (!isHost(occurrenceId, currentUserId)) {
+            throw ReservationChangeDeniedException(eventId = eventId, currentUserId)
+        }
+        val page = if (status != null) {
+            reservationRepository.findByIdOccurrenceIdAndStatus(occurrenceId, status, pageable)
+        } else {
+            reservationRepository.findByIdOccurrenceId(occurrenceId, pageable)
+        }
+        return page.map { it.toDto(eventId) }
     }
 
     @Transactional
@@ -157,6 +179,10 @@ class ReservationService(
         val previousStatus = reservation.status
         assertStatusTransitionAllowed(isAdmin, previousStatus, request.status)
 
+        if (request.status == ReservationStatus.DENIED) {
+            requireRefundIfNeeded(reservation, previousStatus)
+        }
+
         reservation.guests = request.guests
         reservation.payload = request.payload
         reservation.status = request.status
@@ -164,7 +190,6 @@ class ReservationService(
         when (reservation.status) {
             ReservationStatus.DENIED, ReservationStatus.WITHDREW -> {
                 occurrence.participants.removeIf { it.id.userId == userId }
-                maybeRefund(reservation, previousStatus)
             }
             ReservationStatus.ACCEPTED, ReservationStatus.WHITELIST -> {
                 if (previousStatus == ReservationStatus.PAID ||
@@ -300,20 +325,24 @@ class ReservationService(
         }
     }
 
-    private fun maybeRefund(reservation: Reservation, previousStatus: ReservationStatus?) {
+    private fun requireRefundIfNeeded(reservation: Reservation, previousStatus: ReservationStatus?) {
         if (previousStatus !in refundableStatuses) return
-        val sessionId = reservation.stripeCheckoutSessionId ?: return
         if ((reservation.priceMinor ?: 0L) <= 0L) return
-        runCatching {
+        val sessionId = reservation.stripeCheckoutSessionId
+            ?: throw ReservationRefundFailedException(
+                message = "Cannot change status: paid reservation is missing checkout session for refund",
+            )
+        try {
             paymentInternalClient.refundCheckout(RefundConnectCheckoutRequest(sessionId))
-        }.onFailure {
+        } catch (ex: Exception) {
             log.error(
-                "Failed to refund reservation occurrence={} user={} session={}",
+                "Refund failed reservation occurrence={} user={} session={}",
                 reservation.id?.occurrenceId,
                 reservation.id?.userId,
                 sessionId,
-                it,
+                ex,
             )
+            throw ReservationRefundFailedException()
         }
     }
 

@@ -6,12 +6,16 @@ import com.fancia.backend.shared.event.core.dto.CreateReservationRequest
 import com.fancia.backend.shared.event.core.dto.UpdateReservationRequest
 import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutRequest
 import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutResponse
+import com.fancia.backend.shared.event.core.enums.ReservationStatus
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.web.PageableDefault
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
@@ -25,6 +29,25 @@ import java.util.*
 class ReservationController(
     private val reservationService: ReservationService,
 ) {
+    @Operation(
+        summary = "List reservations for an occurrence (host)",
+        description = "Returns reservations for a specific occurrence. Host only.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Reservations listed"),
+        ],
+    )
+    @GetMapping("/{eventId}/occurrences/{occurrenceId}/reservations")
+    fun listReservations(
+        @PathVariable eventId: UUID,
+        @PathVariable occurrenceId: UUID,
+        @RequestParam(required = false) status: ReservationStatus?,
+        @PageableDefault(size = 50) pageable: Pageable,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<Page<ReservationResponse>> =
+        ResponseEntity.ok(reservationService.list(eventId, occurrenceId, status, pageable, jwt))
+
     @Operation(
         summary = "Get reservation",
         description = "Returns a reservation for a specific occurrence and user",

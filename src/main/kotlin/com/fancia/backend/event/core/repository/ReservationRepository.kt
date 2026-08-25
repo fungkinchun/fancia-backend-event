@@ -2,6 +2,9 @@ package com.fancia.backend.event.core.repository
 
 import com.fancia.backend.shared.event.core.entity.Reservation
 import com.fancia.backend.shared.event.core.entity.ReservationId
+import com.fancia.backend.shared.event.core.enums.ReservationStatus
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -13,6 +16,14 @@ interface ReservationRepository : JpaRepository<Reservation, ReservationId> {
     fun findByIdOccurrenceIdAndIdUserId(occurrenceId: UUID, userId: UUID): Reservation?
 
     fun existsByIdOccurrenceIdAndIdUserId(occurrenceId: UUID, userId: UUID): Boolean
+
+    fun findByIdOccurrenceId(occurrenceId: UUID, pageable: Pageable): Page<Reservation>
+
+    fun findByIdOccurrenceIdAndStatus(
+        occurrenceId: UUID,
+        status: ReservationStatus,
+        pageable: Pageable,
+    ): Page<Reservation>
 
     @Query(
         """
