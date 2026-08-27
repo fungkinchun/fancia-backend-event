@@ -42,6 +42,7 @@ class EventService(
     private val eventRepository: EventRepository,
     private val eventOccurrenceRepository: EventOccurrenceRepository,
     private val eventOccurrenceService: EventOccurrenceService,
+    private val eventTicketTierService: EventTicketTierService,
     private val commonServiceClient: CommonServiceClient,
     private val userServiceClient: UserServiceClient,
     private val eventLocationResolver: EventLocationResolver,

@@ -141,6 +141,51 @@ class EventTicketTierControllerIntegrationTest(
             .first()
             .id!!
 
+    test("should create event with ticket tiers in one request") {
+        val hostId = UUID.randomUUID()
+        stubCreateTag("inline-tickets")
+        stubPayoutReady(hostId, ready = true)
+
+        val body = mockMvc.post("/api/events") {
+            with(jwtFor(hostId))
+            content = jsonMapper.writeValueAsString(
+                mapOf(
+                    "name" to "Inline Ticket Event",
+                    "description" to "Event with tiers on create",
+                    "startTime" to "2030-06-01T10:00:00",
+                    "endTime" to "2030-06-01T12:00:00",
+                    "interestGroups" to listOf(UUID.randomUUID()),
+                    "tags" to listOf(mapOf("name" to "inline-tickets", "type" to "TOPIC")),
+                    "visibility" to "PUBLIC",
+                    "links" to emptyList<Any>(),
+                    "approvalRequired" to true,
+                    "ticketTiers" to listOf(
+                        mapOf(
+                            "name" to "General",
+                            "priceMinor" to 2000,
+                            "currency" to "gbp",
+                            "sortOrder" to 0,
+                        ),
+                        mapOf(
+                            "name" to "VIP",
+                            "priceMinor" to 5000,
+                            "currency" to "gbp",
+                            "sortOrder" to 1,
+                        ),
+                    ),
+                ),
+            )
+            contentType = APPLICATION_JSON
+            accept = APPLICATION_JSON
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id", `is`(notNullValue()))
+        }.andReturn().response.contentAsString
+
+        val eventId = UUID.fromString(jsonMapper.readTree(body).get("id").asText())
+        eventTicketTierRepository.findByEventIdOrderBySortOrderAscCreatedAtAsc(eventId).size shouldBe 2
+    }
+
     test("should create free ticket tier without payout check") {
         val hostId = UUID.randomUUID()
         val eventId = createEvent(hostId)

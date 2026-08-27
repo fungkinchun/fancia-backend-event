@@ -11,10 +11,13 @@ import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationExce
 import com.fancia.backend.shared.event.core.dto.CreateEventTicketTierRequest
 import com.fancia.backend.shared.event.core.dto.EventTicketTierResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventTicketTierRequest
+import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.shared.event.core.exception.EventHostPayoutNotReadyException
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
+import com.fancia.backend.shared.event.core.exception.EventTicketPriceTooSmallException
 import com.fancia.backend.shared.event.core.exception.EventTicketTierNotFoundException
 import com.fancia.backend.shared.event.core.exception.ReservationChangeDeniedException
+import com.fancia.backend.shared.payment.core.util.StripeMinAmounts
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
@@ -42,11 +45,25 @@ class EventTicketTierService(
     fun create(eventId: UUID, request: CreateEventTicketTierRequest, jwt: Jwt): EventTicketTierResponse {
         val userId = jwt.userId()
         val event = requireOwnedEvent(eventId, userId)
-        if (request.priceMinor > 0) {
+        return persistTiers(event, listOf(request), userId).single()
+    }
+
+    @Transactional
+    fun persistTiers(
+        event: Event,
+        requests: List<CreateEventTicketTierRequest>,
+        userId: UUID,
+    ): List<EventTicketTierResponse> {
+        if (requests.isEmpty()) return emptyList()
+        val eventId = event.id ?: error("Event must be persisted before ticket tiers")
+        requests.forEach { requireCataloguePrice(it.priceMinor, it.currency) }
+        if (requests.any { it.priceMinor > 0 }) {
             requireHostPayoutReady(eventId, event.createdBy)
         }
-        val tier = request.toEntity(event).also { it.createdBy = userId }
-        return eventTicketTierRepository.save(tier).toDto()
+        return requests.map { request ->
+            val tier = request.toEntity(event).also { it.createdBy = userId }
+            eventTicketTierRepository.save(tier).toDto()
+        }
     }
 
     @Transactional
@@ -60,6 +77,7 @@ class EventTicketTierService(
         requireOwnedEvent(eventId, userId)
         val tier = requireTier(eventId, tierId)
         request.applyTo(tier)
+        requireCataloguePrice(tier.priceMinor, tier.currency)
         if (tier.priceMinor > 0) {
             requireHostPayoutReady(eventId, requireEvent(eventId).createdBy)
         }
@@ -75,6 +93,14 @@ class EventTicketTierService(
     }
 
     fun requireTierEntity(eventId: UUID, tierId: UUID): EventTicketTier = requireTier(eventId, tierId)
+
+    private fun requireCataloguePrice(priceMinor: Long, currency: String) {
+        if (StripeMinAmounts.isAllowedCataloguePrice(priceMinor, currency)) return
+        throw EventTicketPriceTooSmallException(
+            message = "Paid ticket price must be at least ${StripeMinAmounts.formatMinimum(currency)} " +
+                "(Stripe card payment minimum). Use 0 for free tickets.",
+        )
+    }
 
     private fun requireHostPayoutReady(eventId: UUID, hostUserId: UUID?) {
         val hostId = hostUserId ?: throw EventHostPayoutNotReadyException(eventId = eventId)
