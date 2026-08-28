@@ -25,6 +25,7 @@ import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import com.fancia.backend.shared.event.core.exception.EventTicketSoldOutException
 import com.fancia.backend.shared.event.core.exception.EventTicketTierNotFoundException
 import com.fancia.backend.shared.event.core.exception.ReservationChangeDeniedException
+import com.fancia.backend.shared.event.core.exception.ReservationEarlyAccessException
 import com.fancia.backend.shared.event.core.exception.ReservationNotFoundException
 import com.fancia.backend.shared.event.core.exception.ReservationRefundFailedException
 import com.fancia.backend.shared.event.core.exception.ReservationStatusChangeAccessDeniedException
@@ -33,6 +34,8 @@ import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutResponse
 import com.fancia.backend.shared.payment.core.dto.CreateConnectCheckoutSessionRequest
 import com.fancia.backend.shared.payment.core.dto.RefundConnectCheckoutRequest
 import com.fancia.backend.shared.payment.core.enums.ConnectCheckoutPurpose
+import com.fancia.backend.shared.user.core.support.PremiumLimits
+import com.fancia.backend.shared.user.core.support.isPremiumClaim
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
@@ -147,6 +150,7 @@ class ReservationService(
         if (tierId != null) {
             val tier = eventTicketTierRepository.findByIdAndEventId(tierId, eventId)
                 .orElseThrow { EventTicketTierNotFoundException(tierId) }
+            assertPaidEarlyAccess(event, tier.priceMinor, jwt)
             reservation.tierId = tier.id
             reservation.priceMinor = tier.priceMinor
             reservation.currency = tier.currency
@@ -385,6 +389,15 @@ class ReservationService(
         val claimed = reservationRepository.countClaimedSeats(occurrenceId, tierId)
         if (claimed >= capacity) {
             throw EventTicketSoldOutException(tierId)
+        }
+    }
+
+    private fun assertPaidEarlyAccess(event: Event, priceMinor: Long, jwt: Jwt) {
+        if (priceMinor <= 0L || jwt.isPremiumClaim()) return
+        val createdAt = event.createdAt ?: return
+        val opensForFree = createdAt.plusHours(PremiumLimits.PAID_RESERVATION_EARLY_ACCESS_HOURS)
+        if (LocalDateTime.now().isBefore(opensForFree)) {
+            throw ReservationEarlyAccessException(eventId = event.id!!)
         }
     }
 

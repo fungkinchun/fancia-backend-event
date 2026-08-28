@@ -11,6 +11,7 @@ import com.fancia.backend.event.external.CommonServiceClient
 import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
+import com.fancia.backend.shared.common.core.exception.PremiumFeatureLimitException
 import com.fancia.backend.shared.common.core.utils.Slugify
 import com.fancia.backend.shared.common.tag.core.dto.CreateTagsRequest
 import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest
@@ -25,6 +26,8 @@ import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import com.fancia.backend.shared.event.core.exception.GroupEventRequiresInterestGroupsException
 import com.fancia.backend.shared.event.core.exception.InvalidEventScheduleException
 import com.fancia.backend.shared.event.core.model.RecurrenceDaysMask
+import com.fancia.backend.shared.user.core.support.PremiumLimits
+import com.fancia.backend.shared.user.core.support.isPremiumClaim
 import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
@@ -34,6 +37,7 @@ import org.springframework.data.domain.Sort
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.*
 
@@ -80,6 +84,22 @@ class EventService(
         validateVisibility(visibility, request.interestGroups)
         validateSchedule(request.startTime, request.endTime)
         request.recurrence?.let { RecurringEventVisibility.validateRecurrence(it) }
+        if (visibility == EventVisibility.PRIVATE &&
+            !PremiumLimits.allowsUnlimitedPrivateEvents(jwt.isPremiumClaim())
+        ) {
+            val monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay()
+            val hosted = eventRepository.countByCreatedByAndVisibilitySince(
+                currentUserId,
+                EventVisibility.PRIVATE,
+                monthStart,
+            )
+            if (hosted >= PremiumLimits.PRIVATE_EVENTS_PER_MONTH_FREE) {
+                throw PremiumFeatureLimitException(
+                    "Free plan allows up to ${PremiumLimits.PRIVATE_EVENTS_PER_MONTH_FREE} private events per month. " +
+                        "Upgrade to Fancia Premium for unlimited private event hosting.",
+                )
+            }
+        }
         request.toEntity().let {
             it.createdBy = currentUserId
             it.visibility = visibility
@@ -94,6 +114,16 @@ class EventService(
                 request.endTime,
                 currentUserId,
             )
+            request.ticketTiers
+                ?.takeIf { tiers -> tiers.isNotEmpty() }
+                ?.let { tiers ->
+                    eventTicketTierService.persistTiers(
+                        savedEvent,
+                        tiers,
+                        currentUserId,
+                        jwt.isPremiumClaim(),
+                    )
+                }
             return eventOccurrenceService.toUpcomingResponse(savedEvent, LocalDateTime.now())
         }
     }

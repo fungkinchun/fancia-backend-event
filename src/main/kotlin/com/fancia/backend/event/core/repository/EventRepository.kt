@@ -118,4 +118,18 @@ interface EventRepository : JpaRepository<Event, UUID> {
     fun findBySlug(slug: String): Optional<Event>
 
     fun existsBySlug(slug: String): Boolean
+
+    @Query(
+        """
+        SELECT COUNT(e) FROM Event e
+        WHERE e.createdBy = :createdBy
+          AND e.visibility = :visibility
+          AND e.createdAt >= :fromInclusive
+        """,
+    )
+    fun countByCreatedByAndVisibilitySince(
+        @Param("createdBy") createdBy: UUID,
+        @Param("visibility") visibility: com.fancia.backend.shared.event.core.enums.EventVisibility,
+        @Param("fromInclusive") fromInclusive: LocalDateTime,
+    ): Long
 }
