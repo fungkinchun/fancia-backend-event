@@ -6,7 +6,6 @@ import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.EventTicketTierRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
 import com.fancia.backend.event.core.support.CheckInTokens
-import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.event.core.dto.CheckInRequest
 import com.fancia.backend.shared.event.core.dto.CheckInResultResponse
@@ -14,6 +13,7 @@ import com.fancia.backend.shared.event.core.dto.CheckInRosterEntry
 import com.fancia.backend.shared.event.core.dto.CheckInRosterResponse
 import com.fancia.backend.shared.event.core.dto.CheckInSyncRequest
 import com.fancia.backend.shared.event.core.dto.CheckInSyncResponse
+import com.fancia.backend.shared.event.core.dto.ManualCheckInRequest
 import com.fancia.backend.shared.event.core.entity.EventOccurrence
 import com.fancia.backend.shared.event.core.entity.Reservation
 import com.fancia.backend.shared.event.core.enums.EventRole
@@ -22,7 +22,6 @@ import com.fancia.backend.shared.event.core.exception.CheckInAccessDeniedExcepti
 import com.fancia.backend.shared.event.core.exception.CheckInOutsideWindowException
 import com.fancia.backend.shared.event.core.exception.CheckInTokenInvalidException
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
-import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
@@ -38,10 +37,7 @@ class CheckInService(
     private val eventParticipantRepository: EventParticipantRepository,
     private val reservationRepository: ReservationRepository,
     private val eventTicketTierRepository: EventTicketTierRepository,
-    private val userServiceClient: UserServiceClient,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
-
     private val scannerRoles = listOf(EventRole.HOST, EventRole.COHOST)
 
     @Transactional
@@ -54,6 +50,28 @@ class CheckInService(
         val scannerId = jwt.userId()
         val occurrence = requireOccurrenceForScanner(eventId, occurrenceId, scannerId)
         return performCheckIn(occurrence, request.token.trim(), scannerId, softFail = false)
+    }
+
+    @Transactional
+    fun manualCheckIn(
+        eventId: UUID,
+        occurrenceId: UUID,
+        request: ManualCheckInRequest,
+        jwt: Jwt,
+    ): CheckInResultResponse {
+        val scannerId = jwt.userId()
+        val occurrence = requireOccurrenceForScanner(eventId, occurrenceId, scannerId)
+        val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, request.userId)
+            ?: throw CheckInTokenInvalidException()
+        if (reservation.status != ReservationStatus.ACCEPTED) {
+            throw CheckInTokenInvalidException()
+        }
+        if (ensureToken(reservation)) {
+            reservationRepository.save(reservation)
+        }
+        val token = reservation.checkInToken
+            ?: throw CheckInTokenInvalidException()
+        return performCheckIn(occurrence, token, scannerId, softFail = false)
     }
 
     @Transactional
@@ -88,12 +106,11 @@ class CheckInService(
                 reservationRepository.save(reservation)
             }
             val token = reservation.checkInToken ?: return@mapNotNull null
-            val tierName = resolveTierName(eventId, reservation.tierId)
+            val userId = reservation.id!!.userId!!
             CheckInRosterEntry(
                 tokenHash = CheckInTokens.hash(token),
-                userId = reservation.id!!.userId!!,
-                displayName = resolveDisplayName(reservation.id!!.userId!!),
-                tierName = tierName,
+                userId = userId,
+                tierName = resolveTierName(eventId, reservation.tierId),
                 guestCount = reservation.guests,
                 checkedInAt = reservation.checkedInAt,
             )
@@ -149,7 +166,6 @@ class CheckInService(
 
         val userId = reservation.id!!.userId!!
         val tierName = resolveTierName(eventId, reservation.tierId)
-        val displayName = resolveDisplayName(userId)
         val guestCount = reservation.guests
 
         if (reservation.checkedInAt != null) {
@@ -158,7 +174,6 @@ class CheckInService(
                 alreadyCheckedIn = true,
                 checkedInAt = reservation.checkedInAt,
                 userId = userId,
-                displayName = displayName,
                 tierName = tierName,
                 guestCount = guestCount,
             )
@@ -174,7 +189,6 @@ class CheckInService(
             alreadyCheckedIn = false,
             checkedInAt = now,
             userId = userId,
-            displayName = displayName,
             tierName = tierName,
             guestCount = guestCount,
         )
@@ -223,17 +237,6 @@ class CheckInService(
             .orElse(null)
     }
 
-    private fun resolveDisplayName(userId: UUID): String? =
-        runCatching {
-            val profile = userServiceClient.getUser(userId)
-            listOfNotNull(profile.firstName, profile.lastName)
-                .joinToString(" ")
-                .trim()
-                .ifBlank { null }
-        }.onFailure {
-            log.debug("Could not resolve display name for user {}", userId, it)
-        }.getOrNull()
-
     private fun ensureToken(reservation: Reservation): Boolean {
         if (reservation.status != ReservationStatus.ACCEPTED) return false
         if (!reservation.checkInToken.isNullOrBlank()) return false
@@ -253,7 +256,6 @@ class CheckInService(
             alreadyCheckedIn = false,
             checkedInAt = null,
             userId = null,
-            displayName = null,
             tierName = null,
             guestCount = null,
             errorCode = errorCode,

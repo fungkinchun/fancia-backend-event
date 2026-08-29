@@ -6,6 +6,7 @@ import com.fancia.backend.shared.event.core.dto.CheckInResultResponse
 import com.fancia.backend.shared.event.core.dto.CheckInRosterResponse
 import com.fancia.backend.shared.event.core.dto.CheckInSyncRequest
 import com.fancia.backend.shared.event.core.dto.CheckInSyncResponse
+import com.fancia.backend.shared.event.core.dto.ManualCheckInRequest
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -35,6 +36,15 @@ class CheckInController(
         @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<CheckInResultResponse> =
         ResponseEntity.ok(checkInService.checkIn(eventId, occurrenceId, request, jwt))
+
+    @PostMapping("/manual")
+    fun manualCheckIn(
+        @PathVariable eventId: UUID,
+        @PathVariable occurrenceId: UUID,
+        @RequestBody @Valid request: ManualCheckInRequest,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<CheckInResultResponse> =
+        ResponseEntity.ok(checkInService.manualCheckIn(eventId, occurrenceId, request, jwt))
 
     @GetMapping("/roster")
     fun roster(
