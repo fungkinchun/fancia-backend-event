@@ -3,6 +3,8 @@ package com.fancia.backend.event.core.service
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.external.CommonInternalClient
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
+import com.fancia.backend.shared.common.post.core.dto.CastPollVoteRequest
+import com.fancia.backend.shared.common.post.core.enums.PostKind
 import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.CreatePostRequest
 import com.fancia.backend.shared.common.post.core.dto.PostMediaItem
@@ -34,8 +36,10 @@ class EventPostService(
                 authorUserId = currentUserId,
                 body = request.body,
                 media = dedicateMedia(request.media, eventId),
-                featured = request.featured,
-                pinned = request.pinned,
+                status = request.status,
+                expiredAt = request.expiredAt,
+                kind = request.kind,
+                poll = request.poll,
             ),
         )
     }
@@ -68,9 +72,25 @@ class EventPostService(
         commonInternalClient.unlikePost(postId)
     }
 
-    fun list(eventId: UUID, pageable: Pageable): Page<PostResponse> {
+    fun vote(eventId: UUID, postId: UUID, request: CastPollVoteRequest, jwt: Jwt): PostResponse {
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        get(eventId, postId)
+        val post = commonInternalClient.voteOnPost(postId, request)
+        if (post.targetId != eventId) {
+            throw EventNotFoundException(eventId)
+        }
+        return post
+    }
+
+    fun list(
+        eventId: UUID,
+        kind: PostKind? = null,
+        openOnly: Boolean = false,
+        pageable: Pageable,
+    ): Page<PostResponse> {
         requireEvent(eventId)
-        return commonInternalClient.listPosts(eventId, pageable)
+        return commonInternalClient.listPosts(eventId, kind, openOnly, pageable)
     }
 
     fun get(eventId: UUID, postId: UUID): PostResponse {

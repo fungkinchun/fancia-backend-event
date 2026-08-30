@@ -1,5 +1,6 @@
 package com.fancia.backend.event
 
+import com.fancia.backend.shared.common.post.core.enums.PostStatus
 import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.shared.common.post.core.dto.PostMediaResponse
@@ -138,8 +139,7 @@ class EventPostControllerIntegrationTest(
                     sortOrder = 1,
                 ),
             ),
-            featured = true,
-            pinned = false,
+            status = PostStatus.FEATURED,
             createdAt = null,
         )
         stubFor(
@@ -163,8 +163,7 @@ class EventPostControllerIntegrationTest(
                     "mediaType" to "image",
                 ),
             ),
-            "featured" to true,
-            "pinned" to false,
+            "status" to "FEATURED",
         )
         val responseBody = mockMvc
             .post("/api/events/$eventId/occurrences/$occurrenceId/posts") {
@@ -177,23 +176,20 @@ class EventPostControllerIntegrationTest(
                 status { isCreated() }
                 jsonPath("$.id", `is`(postId.toString()))
                 jsonPath("$.targetId", `is`(occurrenceId.toString()))
-                jsonPath("$.featured", `is`(true))
-                jsonPath("$.pinned", `is`(false))
+                jsonPath("$.status", `is`("FEATURED"))
                 jsonPath("$.media.length()", `is`(2))
             }
             .andReturn()
             .response
             .contentAsString
         val response = jsonMapper.readValue(responseBody, object : TypeReference<PostResponse>() {})
-        response.featured shouldBe true
-        response.pinned shouldBe false
+        response.status shouldBe PostStatus.FEATURED
 
         verify(
             postRequestedFor(urlPathEqualTo("/internal/posts"))
                 .withRequestBody(matchingJsonPath("$.targetId", equalTo(occurrenceId.toString())))
                 .withRequestBody(matchingJsonPath("$.authorUserId", equalTo(userId.toString())))
-                .withRequestBody(matchingJsonPath("$.featured", equalTo("true")))
-                .withRequestBody(matchingJsonPath("$.pinned", equalTo("false")))
+                .withRequestBody(matchingJsonPath("$.status", equalTo("FEATURED")))
                 .withRequestBody(matchingJsonPath("$.media.length()", equalTo("2"))),
         )
     }
@@ -210,8 +206,7 @@ class EventPostControllerIntegrationTest(
                     mapOf(
                         "body" to "hello",
                         "media" to emptyList<Any>(),
-                        "featured" to false,
-                        "pinned" to false,
+                        "status" to "VISIBLE",
                     ),
                 )
                 contentType = APPLICATION_JSON

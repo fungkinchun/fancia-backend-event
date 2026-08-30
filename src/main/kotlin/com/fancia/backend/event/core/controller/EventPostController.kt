@@ -1,6 +1,8 @@
 package com.fancia.backend.event.core.controller
 
 import com.fancia.backend.event.core.service.EventPostService
+import com.fancia.backend.shared.common.post.core.dto.CastPollVoteRequest
+import com.fancia.backend.shared.common.post.core.enums.PostKind
 import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
 import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
@@ -23,7 +25,7 @@ import java.util.*
 
 @RestController
 @RequestMapping("/api/events/{eventId}/posts")
-@Tag(name = "Event Posts", description = "Posts on events (featured post is the cover image)")
+@Tag(name = "Event Posts", description = "Posts on events (FEATURED status is the cover image)")
 @SecurityRequirement(name = "bearerAuth")
 class EventPostController(
     private val eventPostService: EventPostService,
@@ -47,13 +49,22 @@ class EventPostController(
         return ResponseEntity.status(HttpStatus.CREATED).body(post)
     }
 
-    @Operation(summary = "List posts on event", description = "Paginated posts for the event, newest first.")
+    @Operation(
+        summary = "List posts on event",
+        description = "Paginated posts for the event, newest first. Use kind=POLL&openOnly=true for open/upcoming votes.",
+    )
     @GetMapping
     fun listPosts(
         @PathVariable eventId: UUID,
+        @RequestParam(required = false)
+        @Parameter(description = "Filter by post kind (TEXT or POLL)")
+        kind: PostKind?,
+        @RequestParam(defaultValue = "false")
+        @Parameter(description = "When true, only open poll posts")
+        openOnly: Boolean,
         @PageableDefault(size = 20) pageable: Pageable,
     ): ResponseEntity<Page<PostResponse>> {
-        return ResponseEntity.ok(eventPostService.list(eventId, pageable))
+        return ResponseEntity.ok(eventPostService.list(eventId, kind, openOnly, pageable))
     }
 
     @Operation(summary = "Get post on event")
@@ -95,5 +106,16 @@ class EventPostController(
     ): ResponseEntity<Void> {
         eventPostService.unlike(eventId, postId, jwt)
         return ResponseEntity.noContent().build()
+    }
+
+    @Operation(summary = "Vote on poll post")
+    @PostMapping("/{postId}/votes")
+    fun voteOnPost(
+        @PathVariable eventId: UUID,
+        @PathVariable postId: UUID,
+        @RequestBody @Valid request: CastPollVoteRequest,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<PostResponse> {
+        return ResponseEntity.ok(eventPostService.vote(eventId, postId, request, jwt))
     }
 }

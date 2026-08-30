@@ -19,6 +19,7 @@ import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventRecurrenceDto
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
+import com.fancia.backend.shared.event.core.enums.EventType
 import com.fancia.backend.shared.event.core.enums.EventVisibility
 import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import com.fancia.backend.shared.event.core.enums.ReservationStatus
@@ -169,6 +170,7 @@ class EventService(
         tagIds: List<UUID>?,
         blacklistedIds: List<UUID>?,
         interestGroupId: UUID?,
+        eventType: EventType?,
         latitude: Double?,
         longitude: Double?,
         radiusKm: Double,
@@ -185,10 +187,18 @@ class EventService(
             if (!canViewUserEvents(userId, viewerId)) {
                 return PageImpl(emptyList(), pageable, 0)
             }
-            return eventOccurrenceRepository.findEventsByUserInvolvement(userId, pageable)
-                .map { event ->
-                    eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
-                }
+            val now = LocalDateTime.now()
+            val involved = eventOccurrenceRepository.findEventsByUserInvolvement(userId, Pageable.unpaged())
+                .content
+                .filter { matchesEventType(it, eventType) }
+            val paged = involved
+                .drop(pageable.offset.toInt())
+                .take(pageable.pageSize)
+            return PageImpl(
+                paged.map { event -> eventOccurrenceService.toUpcomingResponse(event, now) },
+                pageable,
+                involved.size.toLong(),
+            )
         }
 
         if (match || schedule) {
@@ -198,6 +208,7 @@ class EventService(
                 tagIds,
                 blacklistedIds,
                 interestGroupId,
+                eventType,
                 latitude,
                 longitude,
                 radiusKm,
@@ -214,6 +225,7 @@ class EventService(
             return paginateDiscoverable(
                 eventRepository.findNearby(latitude, longitude, radiusMeters, browseFetchPageable(pageable)).content,
                 interestGroupId,
+                eventType,
                 pageable,
                 past,
             ).map { event -> toBrowseDto(event, now, past) }
@@ -250,7 +262,7 @@ class EventService(
                     fetchPageable,
                 )
         }
-        return paginateDiscoverable(events.content, interestGroupId, pageable, past)
+        return paginateDiscoverable(events.content, interestGroupId, eventType, pageable, past)
             .map { event -> toBrowseDto(event, now, past) }
     }
 
@@ -269,12 +281,14 @@ class EventService(
     private fun paginateDiscoverable(
         candidates: List<Event>,
         interestGroupId: UUID?,
+        eventType: EventType?,
         pageable: Pageable,
         past: Boolean = false,
     ): Page<Event> {
         val now = LocalDateTime.now()
         val filtered = candidates.filter {
             isDiscoverable(it, interestGroupId) &&
+                matchesEventType(it, eventType) &&
                 if (past) {
                     RecurringEventVisibility.isPastListable(it, now)
                 } else {
@@ -293,10 +307,14 @@ class EventService(
         return PageImpl(paged, pageable, filtered.size.toLong())
     }
 
+    private fun matchesEventType(event: Event, eventType: EventType?): Boolean =
+        eventType == null || event.eventType == eventType
+
     private fun findPersonalized(
         tagIds: List<UUID>?,
         blacklistedIds: List<UUID>?,
         interestGroupId: UUID?,
+        eventType: EventType?,
         latitude: Double?,
         longitude: Double?,
         radiusKm: Double,
@@ -332,7 +350,9 @@ class EventService(
             now = now,
             schedule = schedule,
             busyOccurrences = busyOccurrences,
-            isDiscoverable = { event -> isDiscoverable(event, interestGroupId) },
+            isDiscoverable = { event ->
+                isDiscoverable(event, interestGroupId) && matchesEventType(event, eventType)
+            },
         )
         val matched = ranked
             .drop(pageable.offset.toInt())

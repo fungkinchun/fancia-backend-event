@@ -216,6 +216,7 @@ class EventControllerIntegrationTest(
                 jsonPath("$.slug", `is`("testevent"))
                 jsonPath("$.id", `is`(notNullValue()))
                 jsonPath("$.interestGroups[0]", `is`(testInterestGroupId.toString()))
+                jsonPath("$.eventType", `is`("REGULAR"))
             }
         val createdEvent = response.toEvent(jsonMapper)
         val found = eventRepository.findByIdOrNull(createdEvent.id!!)
@@ -363,6 +364,55 @@ class EventControllerIntegrationTest(
                 status { isOk() }
                 jsonPath("$.totalElements", `is`(1))
                 jsonPath("$.content[0].name", `is`("testEvent"))
+            }
+    }
+
+    test("should list events filtered by event type") {
+        stubCreateTag("spontaneous")
+        mockMvc
+            .post("/api/events") {
+                with(jwt().jwt {
+                    it.claim("userId", testUserId)
+                })
+                content = jsonMapper.writeValueAsString(
+                    mapOf(
+                        "name" to "Spontaneous Hangout",
+                        "description" to "Tonight near the canal",
+                        "startTime" to "2030-06-02T18:00:00",
+                        "endTime" to "2030-06-02T20:00:00",
+                        "interestGroups" to listOf(testInterestGroupId),
+                        "tags" to listOf(mapOf("name" to "spontaneous", "type" to "TOPIC")),
+                        "eventType" to "SPONTANEOUS",
+                        "visibility" to "PUBLIC",
+                        "links" to emptyList<Any>(),
+                    ),
+                )
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.eventType", `is`("SPONTANEOUS"))
+            }
+
+        mockMvc
+            .get("/api/events?eventType=SPONTANEOUS&page=0&size=10") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalElements", `is`(1))
+                jsonPath("$.content[0].name", `is`("Spontaneous Hangout"))
+                jsonPath("$.content[0].eventType", `is`("SPONTANEOUS"))
+            }
+
+        mockMvc
+            .get("/api/events?eventType=REGULAR&page=0&size=10") {
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.content[?(@.name == 'Spontaneous Hangout')]", `is`(emptyList<Any>()))
             }
     }
 

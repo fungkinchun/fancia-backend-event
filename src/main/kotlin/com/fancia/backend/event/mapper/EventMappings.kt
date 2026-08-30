@@ -8,6 +8,7 @@ import com.fancia.backend.shared.common.social.core.dto.LinkItem
 import com.fancia.backend.shared.common.social.core.dto.LinkResponse
 import com.fancia.backend.shared.common.social.core.entity.Link
 import com.fancia.backend.shared.event.core.dto.*
+import com.fancia.backend.shared.event.core.enums.EventType
 import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import com.fancia.backend.shared.event.core.model.RecurrenceDaysMask
 
@@ -23,6 +24,7 @@ fun Event.toDto(nextOccurrence: EventOccurrence? = null): EventResponse =
         startTime = nextOccurrence?.startTime ?: this@toDto.startTime,
         endTime = nextOccurrence?.endTime ?: this@toDto.endTime,
         tags = this@toDto.tags,
+        eventType = this@toDto.eventType,
         visibility = this@toDto.visibility,
         location = EventLocationSupport.toDto(this),
         links = this@toDto.links.map { it.toDto() }.toSet(),
@@ -38,6 +40,7 @@ fun CreateEventRequest.toEntity(): Event =
         endTime = this@toEntity.endTime
         interestGroups = this@toEntity.interestGroups.toMutableSet()
         links = this@toEntity.links.map { it.toEntity() }.toMutableSet()
+        eventType = this@toEntity.eventType ?: EventType.REGULAR
         approvalRequired = this@toEntity.approvalRequired ?: true
     }
 
@@ -47,6 +50,7 @@ fun UpdateEventRequest.toEntity(event: Event): Event {
     event.endTime = this@toEntity.endTime
     event.links.clear()
     event.links.addAll(this@toEntity.links.map { it.toEntity() })
+    this@toEntity.eventType?.let { event.eventType = it }
     this@toEntity.approvalRequired?.let { event.approvalRequired = it }
     return event
 }
@@ -63,6 +67,7 @@ fun EventResponse.toEntity(): Event =
         startTime = this@toEntity.startTime
         endTime = this@toEntity.endTime
         tags = this@toEntity.tags.toMutableSet()
+        eventType = this@toEntity.eventType
         visibility = this@toEntity.visibility
         links = this@toEntity.links.map { it.toEntity() }.toMutableSet()
         approvalRequired = this@toEntity.approvalRequired

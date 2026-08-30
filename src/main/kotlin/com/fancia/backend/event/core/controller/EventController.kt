@@ -4,6 +4,7 @@ import com.fancia.backend.event.core.service.EventService
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
+import com.fancia.backend.shared.event.core.enums.EventType
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -95,6 +96,9 @@ class EventController(
         @Parameter(description = "Filter events linked to this interest group")
         interestGroup: UUID? = null,
         @RequestParam(required = false)
+        @Parameter(description = "Filter by event type (REGULAR or SPONTANEOUS)")
+        eventType: EventType? = null,
+        @RequestParam(required = false)
         @Parameter(description = "Latitude for proximity search")
         lat: Double?,
         @RequestParam(required = false)
@@ -129,6 +133,7 @@ class EventController(
                 tagIds,
                 blacklistedIds,
                 interestGroup,
+                eventType,
                 lat,
                 lng,
                 radiusKm,
