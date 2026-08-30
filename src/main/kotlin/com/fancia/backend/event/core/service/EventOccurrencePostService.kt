@@ -5,6 +5,7 @@ import com.fancia.backend.event.external.CommonInternalClient
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.post.core.dto.CastPollVoteRequest
 import com.fancia.backend.shared.common.post.core.enums.PostKind
+import com.fancia.backend.shared.common.post.core.enums.PostStatus
 import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.CreatePostRequest
 import com.fancia.backend.shared.common.post.core.dto.PostMediaItem
@@ -105,11 +106,11 @@ class EventOccurrencePostService(
         eventId: UUID,
         occurrenceId: UUID,
         kind: PostKind? = null,
-        openOnly: Boolean = false,
+        status: List<PostStatus>? = null,
         pageable: Pageable,
     ): Page<PostResponse> {
         validateOccurrence(eventId, occurrenceId)
-        return commonInternalClient.listPosts(occurrenceId, kind, openOnly, pageable)
+        return commonInternalClient.listPosts(occurrenceId, kind, status, pageable)
     }
 
     fun get(eventId: UUID, occurrenceId: UUID, postId: UUID): PostResponse {

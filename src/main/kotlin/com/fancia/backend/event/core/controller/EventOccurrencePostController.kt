@@ -6,6 +6,7 @@ import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
 import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
 import com.fancia.backend.shared.common.post.core.enums.PostKind
+import com.fancia.backend.shared.common.post.core.enums.PostStatus
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -62,13 +63,13 @@ class EventOccurrencePostController(
         @RequestParam(required = false)
         @Parameter(description = "Filter by post kind (TEXT or POLL)")
         kind: PostKind?,
-        @RequestParam(defaultValue = "false")
-        @Parameter(description = "When true, only open poll posts")
-        openOnly: Boolean,
+        @RequestParam(required = false)
+        @Parameter(description = "Filter by post status (repeatable)")
+        status: List<PostStatus>?,
         @PageableDefault(size = 20) pageable: Pageable,
     ): ResponseEntity<Page<PostResponse>> {
         return ResponseEntity.ok(
-            eventOccurrencePostService.list(eventId, occurrenceId, kind, openOnly, pageable),
+            eventOccurrencePostService.list(eventId, occurrenceId, kind, status, pageable),
         )
     }
 

@@ -3,6 +3,7 @@ package com.fancia.backend.event.core.controller
 import com.fancia.backend.event.core.service.EventPostService
 import com.fancia.backend.shared.common.post.core.dto.CastPollVoteRequest
 import com.fancia.backend.shared.common.post.core.enums.PostKind
+import com.fancia.backend.shared.common.post.core.enums.PostStatus
 import com.fancia.backend.shared.common.post.core.dto.CreatePostBody
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
 import com.fancia.backend.shared.common.post.core.dto.UpdatePostRequest
@@ -49,22 +50,19 @@ class EventPostController(
         return ResponseEntity.status(HttpStatus.CREATED).body(post)
     }
 
-    @Operation(
-        summary = "List posts on event",
-        description = "Paginated posts for the event, newest first. Use kind=POLL&openOnly=true for open/upcoming votes.",
-    )
+    @Operation(summary = "List posts on event", description = "Paginated posts for the event, newest first.")
     @GetMapping
     fun listPosts(
         @PathVariable eventId: UUID,
         @RequestParam(required = false)
         @Parameter(description = "Filter by post kind (TEXT or POLL)")
         kind: PostKind?,
-        @RequestParam(defaultValue = "false")
-        @Parameter(description = "When true, only open poll posts")
-        openOnly: Boolean,
+        @RequestParam(required = false)
+        @Parameter(description = "Filter by post status (repeatable)")
+        status: List<PostStatus>?,
         @PageableDefault(size = 20) pageable: Pageable,
     ): ResponseEntity<Page<PostResponse>> {
-        return ResponseEntity.ok(eventPostService.list(eventId, kind, openOnly, pageable))
+        return ResponseEntity.ok(eventPostService.list(eventId, kind, status, pageable))
     }
 
     @Operation(summary = "Get post on event")
