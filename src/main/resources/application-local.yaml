@@ -85,8 +85,6 @@ spring:
             url: ${COMMON_INTERNAL_SERVICE_URL:#{null}}
           user-service:
             url: ${USER_SERVICE_URL:#{null}}
-          user-internal-service:
-            url: ${USER_INTERNAL_SERVICE_URL:#{null}}
           payment-service:
             url: ${PAYMENT_SERVICE_URL:#{null}}
           payment-internal-service:
