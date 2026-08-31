@@ -36,10 +36,10 @@ class EventPostService(
                 targetId = eventId,
                 authorUserId = currentUserId,
                 body = request.body,
-                media = dedicateMedia(request.media, eventId),
-                status = request.status,
+                media = dedicateMedia(request.mediaOrEmpty(), eventId),
+                status = request.statusOrDefault(),
                 expiredAt = request.expiredAt,
-                kind = request.kind,
+                kind = request.kindOrDefault(),
                 poll = request.poll,
             ),
         )
