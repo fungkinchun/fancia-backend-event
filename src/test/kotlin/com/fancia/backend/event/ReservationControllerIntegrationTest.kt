@@ -295,10 +295,10 @@ class ReservationControllerIntegrationTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.status", `is`("PENDING"))
+                jsonPath("$.status", `is`("PAID"))
             }
 
-        reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, guestUserId)!!.status?.name shouldBe "PENDING"
+        reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, guestUserId)!!.status?.name shouldBe "PAID"
     }
 
     afterSpec {

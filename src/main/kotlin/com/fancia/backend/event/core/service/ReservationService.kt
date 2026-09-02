@@ -185,7 +185,7 @@ class ReservationService(
         jwt: Jwt,
     ): ReservationResponse {
         val currentUserId = jwt.userId()
-        eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
+        val event = eventRepository.findByIdOrNull(eventId) ?: throw EventNotFoundException(eventId)
         val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
         val isAdmin = isHost(occurrenceId, currentUserId)
         val reservation = reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, userId)
@@ -227,6 +227,14 @@ class ReservationService(
                 occurrence.participants.removeIf { it.id.userId == userId }
             }
             else -> {}
+        }
+
+        if (
+            request.status == ReservationStatus.PENDING &&
+            previousStatus in setOf(ReservationStatus.WITHDREW, ReservationStatus.DENIED) &&
+            (reservation.priceMinor ?: 0L) == 0L
+        ) {
+            markPaid(reservation, occurrence, event, userId, checkoutSessionId = null)
         }
 
         syncCheckInToken(reservation)
