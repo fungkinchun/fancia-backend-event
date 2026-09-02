@@ -70,6 +70,13 @@ class ReservationService(
         ReservationStatus.PENDING,
     )
 
+    private val freeWithdrawableStatuses = setOf(
+        ReservationStatus.PENDING,
+        ReservationStatus.PAID,
+        ReservationStatus.ACCEPTED,
+        ReservationStatus.WHITELIST,
+    )
+
     private val refundableStatuses = setOf(
         ReservationStatus.PAID,
         ReservationStatus.ACCEPTED,
@@ -189,7 +196,13 @@ class ReservationService(
         }
 
         val previousStatus = reservation.status
-        assertStatusTransitionAllowed(isAdmin, previousStatus, request.status)
+        assertStatusTransitionAllowed(
+            isAdmin = isAdmin,
+            isSelf = currentUserId == userId,
+            currentStatus = previousStatus,
+            requestedStatus = request.status,
+            priceMinor = reservation.priceMinor ?: 0L,
+        )
 
         if (request.status == ReservationStatus.DENIED) {
             requireRefundIfNeeded(reservation, previousStatus)
@@ -403,9 +416,18 @@ class ReservationService(
 
     private fun assertStatusTransitionAllowed(
         isAdmin: Boolean,
+        isSelf: Boolean,
         currentStatus: ReservationStatus?,
         requestedStatus: ReservationStatus,
+        priceMinor: Long,
     ) {
+        if (requestedStatus == ReservationStatus.WITHDREW && isSelf) {
+            val allowed = currentStatus in withdrawableStatuses ||
+                (priceMinor <= 0L && currentStatus in freeWithdrawableStatuses)
+            if (!allowed) throw ReservationStatusChangeAccessDeniedException()
+            return
+        }
+
         if (isAdmin) {
             val allowed = when (requestedStatus) {
                 ReservationStatus.ACCEPTED, ReservationStatus.DENIED, ReservationStatus.WHITELIST ->
@@ -419,7 +441,6 @@ class ReservationService(
         }
 
         val allowed = when (requestedStatus) {
-            ReservationStatus.WITHDREW -> currentStatus in withdrawableStatuses
             ReservationStatus.PENDING ->
                 currentStatus == ReservationStatus.WITHDREW ||
                     currentStatus == ReservationStatus.DENIED
