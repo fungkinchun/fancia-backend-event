@@ -1,6 +1,8 @@
 package com.fancia.backend.event.core.controller
 
 import com.fancia.backend.event.core.service.EventService
+import com.fancia.backend.event.core.service.SavedResourceService
+import com.fancia.backend.shared.common.saved.core.dto.SavedResourceResponse
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.dto.UpdateEventRequest
@@ -15,6 +17,7 @@ import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
@@ -27,6 +30,7 @@ import java.util.*
 @SecurityRequirement(name = "bearerAuth")
 class EventController(
     private val eventService: EventService,
+    private val savedResourceService: SavedResourceService,
 ) {
     @Operation(
         summary = "Create event",
@@ -55,6 +59,32 @@ class EventController(
         return ResponseEntity.ok(eventService.update(id, request, jwt))
     }
 
+    @GetMapping("/saved")
+    @Operation(summary = "List events saved by the current user")
+    fun listSaved(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PageableDefault(size = 20) pageable: Pageable,
+    ): ResponseEntity<Page<EventResponse>> =
+        ResponseEntity.ok(eventService.listSavedEvents(jwt, pageable))
+
+    @PostMapping("/{id}/saved")
+    @Operation(summary = "Save an event")
+    fun saveEvent(
+        @PathVariable id: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<SavedResourceResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(savedResourceService.save(id, jwt))
+
+    @DeleteMapping("/{id}/saved")
+    @Operation(summary = "Unsave an event")
+    fun unsaveEvent(
+        @PathVariable id: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<Void> {
+        savedResourceService.unsave(id, jwt)
+        return ResponseEntity.noContent().build()
+    }
+
     @GetMapping("/{ref}")
     @Operation(
         summary = "Get event by id or slug",
@@ -66,8 +96,11 @@ class EventController(
             ApiResponse(responseCode = "404", description = "Event not found"),
         ]
     )
-    fun getEvent(@PathVariable ref: String): ResponseEntity<EventResponse> {
-        return ResponseEntity.ok(eventService.findByIdOrSlug(ref))
+    fun getEvent(
+        @PathVariable ref: String,
+        @AuthenticationPrincipal jwt: Jwt?,
+    ): ResponseEntity<EventResponse> {
+        return ResponseEntity.ok(eventService.findByIdOrSlug(ref, jwt))
     }
 
     @GetMapping
@@ -89,9 +122,6 @@ class EventController(
         @RequestParam(required = false)
         @Parameter(description = "Filter by tag ids (entities matching any of the ids)")
         tagIds: List<UUID> = emptyList(),
-        @RequestParam(required = false)
-        @Parameter(description = "Exclude events matching these tag, organizer, or group ids (match/schedule only)")
-        blacklistedIds: List<UUID> = emptyList(),
         @RequestParam(required = false, name = "interestGroup")
         @Parameter(description = "Filter events linked to this interest group")
         interestGroup: UUID? = null,
@@ -131,7 +161,6 @@ class EventController(
                 name,
                 description,
                 tagIds,
-                blacklistedIds,
                 interestGroup,
                 eventType,
                 lat,

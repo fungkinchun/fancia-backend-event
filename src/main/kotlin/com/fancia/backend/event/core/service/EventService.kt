@@ -52,19 +52,52 @@ class EventService(
     private val userServiceClient: UserServiceClient,
     private val eventLocationResolver: EventLocationResolver,
     private val smartMatchEventRanker: SmartMatchEventRanker,
+    private val blockedResourceService: BlockedResourceService,
+    private val savedResourceService: SavedResourceService,
 ) {
+    fun listSavedEvents(jwt: Jwt, pageable: Pageable): Page<EventResponse> {
+        val page = savedResourceService.listSavedPage(jwt, pageable)
+        if (page.isEmpty) {
+            return PageImpl(emptyList(), pageable, 0)
+        }
+        val ids = page.content.map { it.id.resourceId }
+        val eventsById = eventRepository.findAllById(ids).associateBy { it.id }
+        val now = LocalDateTime.now()
+        val responses = ids.mapNotNull { id ->
+            val event = eventsById[id] ?: return@mapNotNull null
+            eventOccurrenceService.toUpcomingResponse(event, now).also {
+                it.savedByCurrentUser = true
+            }
+        }
+        return PageImpl(responses, pageable, page.totalElements)
+    }
+
     fun findByIdAndCreatedBy(id: UUID, createdBy: UUID): Event? {
         return eventRepository.findByIdAndCreatedBy(id, createdBy)
     }
 
-    fun findById(id: UUID): EventResponse {
-        val event = eventRepository.findById(id).orElseThrow { EventNotFoundException(id) }
-        return eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
+    fun findByIdOrSlug(ref: String, jwt: Jwt? = null): EventResponse {
+        val event = resolveByIdOrSlug(ref)
+        val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
+        enrichSaved(response, jwt)
+        return response
     }
 
-    fun findByIdOrSlug(ref: String): EventResponse {
-        val event = resolveByIdOrSlug(ref)
-        return eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
+    fun findById(id: UUID, jwt: Jwt? = null): EventResponse {
+        val event = eventRepository.findById(id).orElseThrow { EventNotFoundException(id) }
+        val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
+        enrichSaved(response, jwt)
+        return response
+    }
+
+    private fun enrichSaved(response: EventResponse, jwt: Jwt?) {
+        val userId = jwt?.getClaimAsString("userId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+        val eventId = response.id
+        if (userId == null || eventId == null) {
+            response.savedByCurrentUser = null
+            return
+        }
+        response.savedByCurrentUser = savedResourceService.isSaved(userId, eventId)
     }
 
     fun resolveByIdOrSlug(ref: String): Event {
@@ -168,7 +201,6 @@ class EventService(
         name: String?,
         description: String?,
         tagIds: List<UUID>?,
-        blacklistedIds: List<UUID>?,
         interestGroupId: UUID?,
         eventType: EventType?,
         latitude: Double?,
@@ -206,7 +238,6 @@ class EventService(
                 ?: throw InvalidAuthenticationException()
             return findPersonalized(
                 tagIds,
-                blacklistedIds,
                 interestGroupId,
                 eventType,
                 latitude,
@@ -312,7 +343,6 @@ class EventService(
 
     private fun findPersonalized(
         tagIds: List<UUID>?,
-        blacklistedIds: List<UUID>?,
         interestGroupId: UUID?,
         eventType: EventType?,
         latitude: Double?,
@@ -324,9 +354,12 @@ class EventService(
         pageable: Pageable,
     ): Page<EventResponse> {
         val tagIds = tagIds.orEmpty().toSet()
+        val (blockedUserIds, blockedTagIds) = blockedResourceService.loadUserAndTagBlocks(currentUserId)
         val preferences = SmartMatchPreferences(
             tagIds = tagIds,
-            blacklistedIds = blacklistedIds.orEmpty().toSet(),
+            blockedUserIds = blockedUserIds,
+            blockedTagIds = blockedTagIds,
+            blockedEventIds = blockedResourceService.blockedEventIds(currentUserId),
             locationLabel = locationLabel?.trim()?.takeIf { it.isNotEmpty() },
         )
         val now = LocalDateTime.now()

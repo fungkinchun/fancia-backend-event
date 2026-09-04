@@ -12,7 +12,9 @@ import java.util.UUID
 
 data class SmartMatchPreferences(
     val tagIds: Set<UUID> = emptySet(),
-    val blacklistedIds: Set<UUID> = emptySet(),
+    val blockedUserIds: Set<UUID> = emptySet(),
+    val blockedTagIds: Set<UUID> = emptySet(),
+    val blockedEventIds: Set<UUID> = emptySet(),
     val locationLabel: String? = null,
 )
 
@@ -39,11 +41,12 @@ class SmartMatchEventRanker(
         return weights
     }
 
-    fun isBlacklisted(event: Event, blacklistedIds: Set<UUID>): Boolean {
-        if (blacklistedIds.isEmpty()) return false
-        if (event.createdBy != null && event.createdBy in blacklistedIds) return true
-        if (event.tags.any { it in blacklistedIds }) return true
-        if (event.interestGroups.any { it in blacklistedIds }) return true
+    fun isBlocked(event: Event, preferences: SmartMatchPreferences): Boolean {
+        if (event.id != null && event.id in preferences.blockedEventIds) return true
+        if (event.createdBy != null && event.createdBy in preferences.blockedUserIds) return true
+        if (preferences.blockedTagIds.isNotEmpty() && event.tags.any { it in preferences.blockedTagIds }) {
+            return true
+        }
         return false
     }
 
@@ -81,7 +84,7 @@ class SmartMatchEventRanker(
             .filter { event ->
                 isDiscoverable(event) &&
                     RecurringEventVisibility.isListable(event, now) &&
-                    !isBlacklisted(event, preferences.blacklistedIds) &&
+                    !isBlocked(event, preferences) &&
                     (!schedule || !conflictsWithSchedule(event, busyOccurrences, now))
             }
             .map { event -> RankedEvent(event, score(event, tagWeights, preferences, now)) }

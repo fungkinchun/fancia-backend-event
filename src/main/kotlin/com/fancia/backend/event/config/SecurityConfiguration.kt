@@ -20,6 +20,9 @@ class SecurityConfiguration {
         http.authorizeHttpRequests { customizer ->
             customizer.requestMatchers(HttpMethod.GET, "/internal/events/*/occurrences/*/reservations/*/checkout").permitAll()
             customizer.requestMatchers(HttpMethod.POST, "/internal/events/*/occurrences/*/reservations/*/paid").permitAll()
+            customizer.requestMatchers("/api/blocked", "/api/blocked/**").authenticated()
+            customizer.requestMatchers("/api/reports", "/api/reports/**").authenticated()
+            customizer.requestMatchers(HttpMethod.GET, "/api/events/saved").authenticated()
             customizer.requestMatchers(HttpMethod.GET, "/api/**").permitAll()
             customizer.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             customizer.requestMatchers("/actuator/**").permitAll()

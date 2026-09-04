@@ -89,12 +89,12 @@ class SmartMatchEventRankerTest : FunSpec({
         ranked.first().score shouldBeGreaterThan ranked.last().score
     }
 
-    test("blacklisted tag excludes event") {
+    test("blocked tag excludes event") {
         val blocked = event("Blocked Event", setOf(blacklistTagId))
         val allowed = event("Allowed Event", setOf(hikingTagId))
         val preferences = SmartMatchPreferences(
             tagIds = setOf(hikingTagId),
-            blacklistedIds = setOf(blacklistTagId),
+            blockedTagIds = setOf(blacklistTagId),
         )
         val ranked = ranker.rank(
             candidates = listOf(blocked, allowed),
@@ -109,12 +109,12 @@ class SmartMatchEventRankerTest : FunSpec({
         ranked.single().event.name shouldBe "Allowed Event"
     }
 
-    test("blacklisted organizer excludes event") {
+    test("blocked organizer excludes event") {
         val blocked = event("Organizer Blocked", createdBy = organizerId)
         val allowed = event("Other Host", setOf(hikingTagId))
         val preferences = SmartMatchPreferences(
             tagIds = setOf(hikingTagId),
-            blacklistedIds = setOf(organizerId),
+            blockedUserIds = setOf(organizerId),
         )
         val ranked = ranker.rank(
             candidates = listOf(blocked, allowed),
