@@ -1,5 +1,9 @@
 package com.fancia.backend.event.core.service
 
+import tools.jackson.core.type.TypeReference
+import com.fancia.backend.shared.common.redis.CacheKeys
+import com.fancia.backend.shared.common.redis.CachedPage
+import com.fancia.backend.shared.common.redis.RedisQueryCache
 import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
@@ -30,6 +34,7 @@ import com.fancia.backend.shared.event.core.model.RecurrenceDaysMask
 import com.fancia.backend.shared.user.core.support.PremiumLimits
 import com.fancia.backend.shared.user.core.support.isPremiumClaim
 import jakarta.validation.Valid
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
@@ -38,6 +43,7 @@ import org.springframework.data.domain.Sort
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.*
@@ -54,6 +60,7 @@ class EventService(
     private val smartMatchEventRanker: SmartMatchEventRanker,
     private val blockedResourceService: BlockedResourceService,
     private val savedResourceService: SavedResourceService,
+    private val redisQueryCache: ObjectProvider<RedisQueryCache>,
 ) {
     fun listSavedEvents(jwt: Jwt, pageable: Pageable): Page<EventResponse> {
         val page = savedResourceService.listSavedPage(jwt, pageable)
@@ -158,6 +165,7 @@ class EventService(
                         jwt.isPremiumClaim(),
                     )
                 }
+            invalidateEventCaches()
             return eventOccurrenceService.toUpcomingResponse(savedEvent, LocalDateTime.now())
         }
     }
@@ -182,6 +190,7 @@ class EventService(
                 }
             },
         ).let { updated ->
+            invalidateEventCaches()
             eventOccurrenceService.toUpcomingResponse(updated, LocalDateTime.now())
         }
     }
@@ -194,6 +203,7 @@ class EventService(
         }
         if (eventsWithTag.isNotEmpty()) {
             eventRepository.saveAll(eventsWithTag)
+            invalidateEventCaches()
         }
     }
 
@@ -236,7 +246,7 @@ class EventService(
         if (match || schedule) {
             val currentUserId = jwt?.getClaimAsString("userId")?.let { UUID.fromString(it) }
                 ?: throw InvalidAuthenticationException()
-            return findPersonalized(
+            return cachedPersonalized(
                 tagIds,
                 interestGroupId,
                 eventType,
@@ -250,6 +260,82 @@ class EventService(
             )
         }
 
+        val cache = redisQueryCache.ifAvailable
+        if (cache != null) {
+            val key = browseCacheKey(
+                name, description, tagIds, interestGroupId, eventType,
+                latitude, longitude, radiusKm, past, pageable,
+            )
+            val cached = cache.getOrLoad(
+                key,
+                BROWSE_TTL,
+                object : TypeReference<CachedPage<EventResponse>>() {},
+            ) {
+                CachedPage.from(
+                    loadPublicBrowse(
+                        name, description, tagIds, interestGroupId, eventType,
+                        latitude, longitude, radiusKm, past, pageable,
+                    ),
+                )
+            }
+            return cached.toPage(pageable)
+        }
+        return loadPublicBrowse(
+            name, description, tagIds, interestGroupId, eventType,
+            latitude, longitude, radiusKm, past, pageable,
+        )
+    }
+
+    private fun cachedPersonalized(
+        tagIds: List<UUID>?,
+        interestGroupId: UUID?,
+        eventType: EventType?,
+        latitude: Double?,
+        longitude: Double?,
+        radiusKm: Double,
+        locationLabel: String?,
+        schedule: Boolean,
+        currentUserId: UUID,
+        pageable: Pageable,
+    ): Page<EventResponse> {
+        val cache = redisQueryCache.ifAvailable
+        if (cache == null) {
+            return findPersonalized(
+                tagIds, interestGroupId, eventType, latitude, longitude,
+                radiusKm, locationLabel, schedule, currentUserId, pageable,
+            )
+        }
+        val key = "$MATCH_PREFIX$currentUserId:" + CacheKeys.hash(
+            tagIds, interestGroupId, eventType, latitude, longitude,
+            radiusKm, locationLabel, schedule, pageable.pageNumber, pageable.pageSize,
+        )
+        val cached = cache.getOrLoad(
+            key,
+            MATCH_TTL,
+            object : TypeReference<CachedPage<EventResponse>>() {},
+        ) {
+            CachedPage.from(
+                findPersonalized(
+                    tagIds, interestGroupId, eventType, latitude, longitude,
+                    radiusKm, locationLabel, schedule, currentUserId, pageable,
+                ),
+            )
+        }
+        return cached.toPage(pageable)
+    }
+
+    private fun loadPublicBrowse(
+        name: String?,
+        description: String?,
+        tagIds: List<UUID>?,
+        interestGroupId: UUID?,
+        eventType: EventType?,
+        latitude: Double?,
+        longitude: Double?,
+        radiusKm: Double,
+        past: Boolean,
+        pageable: Pageable,
+    ): Page<EventResponse> {
         if (latitude != null && longitude != null) {
             val radiusMeters = radiusKm * 1000
             val now = LocalDateTime.now()
@@ -295,6 +381,36 @@ class EventService(
         }
         return paginateDiscoverable(events.content, interestGroupId, eventType, pageable, past)
             .map { event -> toBrowseDto(event, now, past) }
+    }
+
+    private fun browseCacheKey(
+        name: String?,
+        description: String?,
+        tagIds: List<UUID>?,
+        interestGroupId: UUID?,
+        eventType: EventType?,
+        latitude: Double?,
+        longitude: Double?,
+        radiusKm: Double,
+        past: Boolean,
+        pageable: Pageable,
+    ): String =
+        BROWSE_PREFIX + CacheKeys.hash(
+            name?.trim(), description?.trim(), tagIds, interestGroupId, eventType,
+            latitude, longitude, radiusKm, past, pageable.pageNumber, pageable.pageSize,
+        )
+
+    private fun invalidateEventCaches() {
+        val cache = redisQueryCache.ifAvailable ?: return
+        cache.evictByPrefix(BROWSE_PREFIX)
+        cache.evictByPrefix(MATCH_PREFIX)
+    }
+
+    companion object {
+        private const val BROWSE_PREFIX = "event:browse:"
+        private const val MATCH_PREFIX = "event:match:"
+        private val BROWSE_TTL = Duration.ofSeconds(60)
+        private val MATCH_TTL = Duration.ofSeconds(30)
     }
 
     private fun toBrowseDto(event: Event, now: LocalDateTime, past: Boolean): EventResponse {

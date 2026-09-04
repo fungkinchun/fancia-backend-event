@@ -5,6 +5,7 @@ import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.EventTicketTierRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
 import com.fancia.backend.event.core.support.CheckInTokens
+import com.fancia.backend.event.external.NotificationInternalClient
 import com.fancia.backend.event.external.PaymentInternalClient
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.event.mapper.toEntity
@@ -29,6 +30,7 @@ import com.fancia.backend.shared.event.core.exception.ReservationEarlyAccessExce
 import com.fancia.backend.shared.event.core.exception.ReservationNotFoundException
 import com.fancia.backend.shared.event.core.exception.ReservationRefundFailedException
 import com.fancia.backend.shared.event.core.exception.ReservationStatusChangeAccessDeniedException
+import com.fancia.backend.shared.notification.core.dto.SendPushNotificationRequest
 import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutRequest
 import com.fancia.backend.shared.payment.core.dto.ConnectCheckoutResponse
 import com.fancia.backend.shared.payment.core.dto.CreateConnectCheckoutSessionRequest
@@ -57,6 +59,7 @@ class ReservationService(
     private val eventTicketTierRepository: EventTicketTierRepository,
     private val eventUserTagSyncService: EventUserTagSyncService,
     private val paymentInternalClient: PaymentInternalClient,
+    private val notificationInternalClient: NotificationInternalClient,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -172,6 +175,9 @@ class ReservationService(
         }
 
         val saved = reservationRepository.save(reservation)
+        if (saved.status == ReservationStatus.ACCEPTED) {
+            notifyReservationAccepted(currentUserId, event, eventId, occurrenceId)
+        }
         val includeToken = saved.status == ReservationStatus.ACCEPTED
         return saved.toDto(eventId, includeCheckInToken = includeToken)
     }
@@ -239,6 +245,9 @@ class ReservationService(
 
         syncCheckInToken(reservation)
         val saved = reservationRepository.saveAndFlush(reservation)
+        if (previousStatus != ReservationStatus.ACCEPTED && saved.status == ReservationStatus.ACCEPTED) {
+            notifyReservationAccepted(userId, event, eventId, occurrenceId)
+        }
         val includeToken = currentUserId == userId && saved.status == ReservationStatus.ACCEPTED
         return saved.toDto(eventId, includeCheckInToken = includeToken)
     }
@@ -342,7 +351,11 @@ class ReservationService(
         assertCapacityAvailable(occurrenceId, tierId, tier.capacityPerOccurrence)
 
         markPaid(reservation, occurrence, event, userId, checkoutSessionId)
-        return reservationRepository.save(reservation).toDto(eventId, includeCheckInToken = false)
+        val saved = reservationRepository.save(reservation)
+        if (saved.status == ReservationStatus.ACCEPTED) {
+            notifyReservationAccepted(userId, event, eventId, occurrenceId)
+        }
+        return saved.toDto(eventId, includeCheckInToken = false)
     }
 
     private fun markPaid(
@@ -370,6 +383,36 @@ class ReservationService(
             }
         } else {
             reservation.checkInToken = null
+        }
+    }
+
+    private fun notifyReservationAccepted(
+        userId: UUID,
+        event: Event,
+        eventId: UUID,
+        occurrenceId: UUID,
+    ) {
+        try {
+            notificationInternalClient.sendPush(
+                SendPushNotificationRequest(
+                    userId = userId,
+                    title = "Reservation approved",
+                    body = "You're going to ${event.name}",
+                    type = "EVENT_RESERVATION_ACCEPTED",
+                    path = "/events/$eventId",
+                    data = mapOf(
+                        "eventId" to eventId.toString(),
+                        "occurrenceId" to occurrenceId.toString(),
+                    ),
+                ),
+            )
+        } catch (ex: Exception) {
+            log.warn(
+                "Failed to send reservation approved push user={} event={}",
+                userId,
+                eventId,
+                ex,
+            )
         }
     }
 
