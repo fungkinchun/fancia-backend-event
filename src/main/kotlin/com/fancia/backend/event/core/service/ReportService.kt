@@ -1,7 +1,7 @@
 package com.fancia.backend.event.core.service
 
 import com.fancia.backend.event.core.repository.ReportRepository
-import com.fancia.backend.event.external.UserBlockedClient
+import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.shared.common.core.exception.DomainException
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.moderation.core.dto.CreateBlockedResourceRequest
@@ -20,7 +20,7 @@ import java.util.UUID
 class ReportService(
     private val reportRepository: ReportRepository,
     private val blockedResourceService: BlockedResourceService,
-    private val userBlockedClient: UserBlockedClient,
+    private val userServiceClient: UserServiceClient,
 ) {
     @Transactional
     fun create(request: CreateReportRequest, jwt: Jwt): ReportResponse {
@@ -57,7 +57,7 @@ class ReportService(
                     message = "targetOwnerUserId is required when alsoBlockUser is true",
                     errorCode = "TARGET_OWNER_REQUIRED",
                 )
-            userBlockedClient.block(
+            userServiceClient.block(
                 CreateBlockedResourceRequest(
                     resourceType = BlockedResourceType.USER,
                     resourceId = ownerId,
