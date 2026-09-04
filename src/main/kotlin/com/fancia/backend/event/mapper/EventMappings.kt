@@ -45,6 +45,7 @@ fun CreateEventRequest.toEntity(): Event =
     }
 
 fun UpdateEventRequest.toEntity(event: Event): Event {
+    event.name = this@toEntity.name
     event.description = this@toEntity.description
     event.startTime = this@toEntity.startTime
     event.endTime = this@toEntity.endTime
