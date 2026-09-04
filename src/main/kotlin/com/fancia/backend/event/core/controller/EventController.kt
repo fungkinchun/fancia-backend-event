@@ -59,7 +59,7 @@ class EventController(
         return ResponseEntity.ok(eventService.update(id, request, jwt))
     }
 
-    @GetMapping("/saved")
+    @GetMapping("/me/saved")
     @Operation(summary = "List events saved by the current user")
     fun listSaved(
         @AuthenticationPrincipal jwt: Jwt,
