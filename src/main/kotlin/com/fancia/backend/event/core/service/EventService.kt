@@ -743,7 +743,10 @@ class EventService(
         ) {
             return
         }
-        throw EventNotFoundException(event.id ?: event.slug)
+        if (eventId == null) {
+            throw EventNotFoundException(event.slug)
+        }
+        throw EventNotFoundException(eventId)
     }
 
     fun assertCanJoin(event: Event, jwt: Jwt, invite: String?) {
