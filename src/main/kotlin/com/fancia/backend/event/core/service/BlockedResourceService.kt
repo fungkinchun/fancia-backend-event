@@ -90,6 +90,40 @@ class BlockedResourceService(
         }
     }
 
+    fun loadPostVisibilityBlocks(userId: UUID): Pair<Set<UUID>, Set<UUID>> {
+        return try {
+            val response = userInternalClient.getBlocked(
+                userId,
+                listOf(BlockedResourceType.POST, BlockedResourceType.USER),
+            )
+            val blocked = response.blocked
+            Pair(
+                blocked[BlockedResourceType.POST].orEmpty().toSet(),
+                blocked[BlockedResourceType.USER].orEmpty().toSet(),
+            )
+        } catch (ex: FeignException) {
+            log.warn("Failed to load blocked POST/USER for userId={}", userId, ex)
+            Pair(emptySet(), emptySet())
+        }
+    }
+
+    fun loadCommentVisibilityBlocks(userId: UUID): Pair<Set<UUID>, Set<UUID>> {
+        return try {
+            val response = userInternalClient.getBlocked(
+                userId,
+                listOf(BlockedResourceType.COMMENT, BlockedResourceType.USER),
+            )
+            val blocked = response.blocked
+            Pair(
+                blocked[BlockedResourceType.COMMENT].orEmpty().toSet(),
+                blocked[BlockedResourceType.USER].orEmpty().toSet(),
+            )
+        } catch (ex: FeignException) {
+            log.warn("Failed to load blocked COMMENT/USER for userId={}", userId, ex)
+            Pair(emptySet(), emptySet())
+        }
+    }
+
     fun validateOwnedType(resourceType: BlockedResourceType) {
         if (resourceType != BlockedResourceType.EVENT) {
             throw UnsupportedBlockedResourceTypeException()

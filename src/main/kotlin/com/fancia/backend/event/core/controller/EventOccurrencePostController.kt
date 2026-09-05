@@ -67,9 +67,10 @@ class EventOccurrencePostController(
         @Parameter(description = "Filter by post status (repeatable)")
         status: List<PostStatus>?,
         @PageableDefault(size = 20) pageable: Pageable,
+        @AuthenticationPrincipal jwt: Jwt?,
     ): ResponseEntity<Page<PostResponse>> {
         return ResponseEntity.ok(
-            eventOccurrencePostService.list(eventId, occurrenceId, kind, status, pageable),
+            eventOccurrencePostService.list(eventId, occurrenceId, kind, status, pageable, jwt),
         )
     }
 
@@ -79,8 +80,9 @@ class EventOccurrencePostController(
         @PathVariable eventId: UUID,
         @PathVariable occurrenceId: UUID,
         @PathVariable postId: UUID,
+        @AuthenticationPrincipal jwt: Jwt?,
     ): ResponseEntity<PostResponse> {
-        return ResponseEntity.ok(eventOccurrencePostService.get(eventId, occurrenceId, postId))
+        return ResponseEntity.ok(eventOccurrencePostService.get(eventId, occurrenceId, postId, jwt))
     }
 
     @Operation(summary = "Update post")

@@ -61,8 +61,9 @@ class EventPostController(
         @Parameter(description = "Filter by post status (repeatable)")
         status: List<PostStatus>?,
         @PageableDefault(size = 20) pageable: Pageable,
+        @AuthenticationPrincipal jwt: Jwt?,
     ): ResponseEntity<Page<PostResponse>> {
-        return ResponseEntity.ok(eventPostService.list(eventId, kind, status, pageable))
+        return ResponseEntity.ok(eventPostService.list(eventId, kind, status, pageable, jwt))
     }
 
     @Operation(summary = "Get post on event")
@@ -70,8 +71,9 @@ class EventPostController(
     fun getPost(
         @PathVariable eventId: UUID,
         @PathVariable postId: UUID,
+        @AuthenticationPrincipal jwt: Jwt?,
     ): ResponseEntity<PostResponse> {
-        return ResponseEntity.ok(eventPostService.get(eventId, postId))
+        return ResponseEntity.ok(eventPostService.get(eventId, postId, jwt))
     }
 
     @Operation(summary = "Update post")
