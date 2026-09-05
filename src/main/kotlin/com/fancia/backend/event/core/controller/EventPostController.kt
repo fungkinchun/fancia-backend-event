@@ -87,6 +87,17 @@ class EventPostController(
         return ResponseEntity.ok(eventPostService.update(eventId, postId, request, jwt))
     }
 
+    @Operation(summary = "Delete post")
+    @DeleteMapping("/{postId}")
+    fun deletePost(
+        @PathVariable eventId: UUID,
+        @PathVariable postId: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
+    ): ResponseEntity<Void> {
+        eventPostService.delete(eventId, postId, jwt)
+        return ResponseEntity.noContent().build()
+    }
+
     @Operation(summary = "Like post")
     @PostMapping("/{postId}/likes")
     fun likePost(

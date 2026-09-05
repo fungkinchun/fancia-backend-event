@@ -63,6 +63,13 @@ class EventPostService(
         return post
     }
 
+    fun delete(eventId: UUID, postId: UUID, jwt: Jwt) {
+        jwt.getClaimAsString("userId")?.let { UUID.fromString(it) }
+            ?: throw InvalidAuthenticationException()
+        get(eventId, postId, jwt)
+        commonInternalClient.deletePost(postId)
+    }
+
     fun like(eventId: UUID, postId: UUID, jwt: Jwt) {
         get(eventId, postId, jwt)
         commonInternalClient.likePost(postId)
