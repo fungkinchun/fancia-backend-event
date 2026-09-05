@@ -76,6 +76,7 @@ class EventService(
         val now = LocalDateTime.now()
         val responses = ids.mapNotNull { id ->
             val event = eventsById[id] ?: return@mapNotNull null
+            if (isBlockedForViewer(event, jwt)) return@mapNotNull null
             eventOccurrenceService.toUpcomingResponse(event, now).also {
                 it.savedByCurrentUser = true
             }
@@ -90,6 +91,7 @@ class EventService(
     fun findByIdOrSlug(ref: String, jwt: Jwt? = null, invite: String? = null): EventResponse {
         val event = syncInviteToken(resolveByIdOrSlug(ref))
         assertCanAccess(event, jwt, invite)
+        assertNotBlocked(event, jwt)
         val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
         enrichSaved(response, jwt)
         exposeInviteTokenIfCreator(response, event, jwt)
@@ -101,6 +103,7 @@ class EventService(
             eventRepository.findById(id).orElseThrow { EventNotFoundException(id) },
         )
         assertCanAccess(event, jwt, invite)
+        assertNotBlocked(event, jwt)
         val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
         enrichSaved(response, jwt)
         exposeInviteTokenIfCreator(response, event, jwt)
@@ -277,6 +280,7 @@ class EventService(
             val involved = eventOccurrenceRepository.findEventsByUserInvolvement(userId, Pageable.unpaged())
                 .content
                 .filter { matchesEventType(it, eventType) }
+                .filter { !isBlockedForViewer(it, jwt) }
             val paged = involved
                 .drop(pageable.offset.toInt())
                 .take(pageable.pageSize)
@@ -305,7 +309,7 @@ class EventService(
         }
 
         val cache = redisQueryCache.ifAvailable
-        if (cache != null) {
+        val browse = if (cache != null) {
             val key = browseCacheKey(
                 name, description, tagIds, interestGroupId, eventType,
                 latitude, longitude, radiusKm, past, pageable,
@@ -322,12 +326,14 @@ class EventService(
                     ),
                 )
             }
-            return cached.toPage(pageable)
+            cached.toPage(pageable)
+        } else {
+            loadPublicBrowse(
+                name, description, tagIds, interestGroupId, eventType,
+                latitude, longitude, radiusKm, past, pageable,
+            )
         }
-        return loadPublicBrowse(
-            name, description, tagIds, interestGroupId, eventType,
-            latitude, longitude, radiusKm, past, pageable,
-        )
+        return filterBlockedEventResponses(browse, pageable, jwt)
     }
 
     private fun cachedPersonalized(
@@ -780,6 +786,44 @@ class EventService(
         } else {
             response.inviteToken = null
         }
+    }
+
+    private fun assertNotBlocked(event: Event, jwt: Jwt?) {
+        if (isBlockedForViewer(event, jwt)) {
+            val eventId = event.id ?: throw EventNotFoundException(event.slug)
+            throw EventNotFoundException(eventId)
+        }
+    }
+
+    private fun isBlockedForViewer(event: Event, jwt: Jwt?): Boolean {
+        val viewerId = jwtUserId(jwt) ?: return false
+        val eventId = event.id
+        if (eventId != null && eventId in blockedResourceService.blockedEventIds(viewerId)) {
+            return true
+        }
+        val createdBy = event.createdBy ?: return false
+        val (blockedUsers, _) = blockedResourceService.loadUserAndTagBlocks(viewerId)
+        return createdBy in blockedUsers
+    }
+
+    private fun filterBlockedEventResponses(
+        page: Page<EventResponse>,
+        pageable: Pageable,
+        jwt: Jwt?,
+    ): Page<EventResponse> {
+        val viewerId = jwtUserId(jwt) ?: return page
+        if (page.isEmpty) return page
+        val blockedEvents = blockedResourceService.blockedEventIds(viewerId)
+        val (blockedUsers, _) = blockedResourceService.loadUserAndTagBlocks(viewerId)
+        if (blockedEvents.isEmpty() && blockedUsers.isEmpty()) return page
+        val kept = page.content.filter { event ->
+            val id = event.id
+            if (id != null && id in blockedEvents) return@filter false
+            val createdBy = event.createdBy
+            createdBy == null || createdBy !in blockedUsers
+        }
+        if (kept.size == page.content.size) return page
+        return PageImpl(kept, pageable, page.totalElements)
     }
 
     private fun jwtUserId(jwt: Jwt?): UUID? =
