@@ -3,6 +3,7 @@ package com.fancia.backend.event.mapper
 import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.shared.event.core.entity.EventOccurrence
 import com.fancia.backend.shared.event.core.entity.EventParticipant
+import com.fancia.backend.shared.event.core.entity.EventTimeSlot
 import com.fancia.backend.event.core.support.EventLocationSupport
 import com.fancia.backend.shared.common.social.core.dto.LinkItem
 import com.fancia.backend.shared.common.social.core.dto.LinkResponse
@@ -30,6 +31,9 @@ fun Event.toDto(nextOccurrence: EventOccurrence? = null): EventResponse =
         links = this@toDto.links.map { it.toDto() }.toSet(),
         recurrence = toRecurrenceDto(this@toDto),
         approvalRequired = this@toDto.approvalRequired,
+        timeSlots = this@toDto.timeSlots
+            .sortedBy { it.sortOrder }
+            .mapNotNull { it.toDto() },
     )
 
 fun CreateEventRequest.toEntity(): Event =
@@ -47,8 +51,8 @@ fun CreateEventRequest.toEntity(): Event =
 fun UpdateEventRequest.toEntity(event: Event): Event {
     event.name = this@toEntity.name
     event.description = this@toEntity.description
-    event.startTime = this@toEntity.startTime
-    event.endTime = this@toEntity.endTime
+    this@toEntity.startTime?.let { event.startTime = it }
+    this@toEntity.endTime?.let { event.endTime = it }
     event.links.clear()
     event.links.addAll(this@toEntity.links.map { it.toEntity() })
     this@toEntity.eventType?.let { event.eventType = it }
@@ -96,5 +100,15 @@ private fun toRecurrenceDto(event: Event): EventRecurrenceDto? {
         frequency = event.recurrenceFrequency,
         daysOfWeek = RecurrenceDaysMask(event.recurrenceDaysMask).toDayOfWeekSet(),
         pausedUntil = event.recurrencePausedUntil,
+    )
+}
+
+private fun EventTimeSlot.toDto(): EventTimeSlotResponse? {
+    val slotId = id ?: return null
+    return EventTimeSlotResponse(
+        id = slotId,
+        startTime = startTime,
+        endTime = endTime,
+        sortOrder = sortOrder,
     )
 }

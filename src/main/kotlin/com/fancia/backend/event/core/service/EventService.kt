@@ -5,9 +5,11 @@ import com.fancia.backend.shared.common.redis.CacheKeys
 import com.fancia.backend.shared.common.redis.CachedPage
 import com.fancia.backend.shared.common.redis.RedisQueryCache
 import com.fancia.backend.shared.event.core.entity.Event
+import com.fancia.backend.shared.event.core.entity.EventTimeSlot
 import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
 import com.fancia.backend.event.core.support.BusyOccurrence
+import com.fancia.backend.shared.event.core.support.EventTimeSlotSchedule
 import com.fancia.backend.shared.event.core.support.RecurringEventVisibility
 import com.fancia.backend.event.core.support.SmartMatchEventRanker
 import com.fancia.backend.event.core.support.SmartMatchPreferences
@@ -29,7 +31,6 @@ import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
 import com.fancia.backend.shared.event.core.enums.ReservationStatus
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
 import com.fancia.backend.shared.event.core.exception.GroupEventRequiresInterestGroupsException
-import com.fancia.backend.shared.event.core.exception.InvalidEventScheduleException
 import com.fancia.backend.shared.event.core.model.RecurrenceDaysMask
 import com.fancia.backend.shared.user.core.support.PremiumLimits
 import com.fancia.backend.shared.user.core.support.isPremiumClaim
@@ -123,7 +124,11 @@ class EventService(
             ?: throw InvalidAuthenticationException()
         val visibility = request.visibility ?: EventVisibility.PUBLIC
         validateVisibility(visibility, request.interestGroups)
-        validateSchedule(request.startTime, request.endTime)
+        val scheduleWindows = EventTimeSlotSchedule.resolve(
+            request.startTime,
+            request.endTime,
+            request.timeSlots,
+        )
         request.recurrence?.let { RecurringEventVisibility.validateRecurrence(it) }
         if (visibility == EventVisibility.PRIVATE &&
             !PremiumLimits.allowsUnlimitedPrivateEvents(jwt.isPremiumClaim())
@@ -149,12 +154,18 @@ class EventService(
             eventLocationResolver.apply(it, request.location)
             applyRecurrence(it, request.recurrence)
             val savedEvent = eventRepository.save(it)
-            eventOccurrenceService.createInitialOccurrence(
-                savedEvent,
-                request.startTime,
-                request.endTime,
-                currentUserId,
-            )
+            replaceTimeSlots(savedEvent, scheduleWindows, currentUserId)
+            syncDenormalizedSchedule(savedEvent)
+            eventRepository.save(savedEvent)
+            savedEvent.timeSlots.sortedBy { slot -> slot.sortOrder }.forEach { slot ->
+                eventOccurrenceService.createInitialOccurrence(
+                    savedEvent,
+                    slot.startTime,
+                    slot.endTime,
+                    currentUserId,
+                    slot,
+                )
+            }
             request.ticketTiers
                 ?.takeIf { tiers -> tiers.isNotEmpty() }
                 ?.let { tiers ->
@@ -177,7 +188,11 @@ class EventService(
         val event = findByIdAndCreatedBy(id, currentUserId) ?: throw EventNotFoundException(id)
         val visibility = request.visibility ?: event.visibility
         validateVisibility(visibility, event.interestGroups)
-        validateSchedule(request.startTime, request.endTime)
+        val scheduleWindows = EventTimeSlotSchedule.resolve(
+            request.startTime,
+            request.endTime,
+            request.timeSlots,
+        )
         return eventRepository.save(
             request.toEntity(event).apply {
                 this.visibility = visibility
@@ -188,8 +203,22 @@ class EventService(
                 } else {
                     this.recurrencePausedUntil = null
                 }
+                replaceTimeSlots(this, scheduleWindows, currentUserId)
+                syncDenormalizedSchedule(this)
             },
         ).let { updated ->
+            updated.timeSlots.sortedBy { slot -> slot.sortOrder }.forEach { slot ->
+                val eventId = updated.id ?: return@forEach
+                if (!eventOccurrenceRepository.existsByEventIdAndStartTime(eventId, slot.startTime)) {
+                    eventOccurrenceService.createInitialOccurrence(
+                        updated,
+                        slot.startTime,
+                        slot.endTime,
+                        currentUserId,
+                        slot,
+                    )
+                }
+            }
             invalidateEventCaches()
             eventOccurrenceService.toUpcomingResponse(updated, LocalDateTime.now())
         }
@@ -634,10 +663,40 @@ class EventService(
         return RecurringEventVisibility.isListable(event, now)
     }
 
-    private fun validateSchedule(startTime: LocalDateTime, endTime: LocalDateTime) {
-        if (!endTime.isAfter(startTime)) {
-            throw InvalidEventScheduleException()
+    private fun replaceTimeSlots(
+        event: Event,
+        windows: List<EventTimeSlotSchedule.Window>,
+        userId: UUID,
+    ) {
+        val existing = event.timeSlots.sortedBy { it.sortOrder }.toMutableList()
+        windows.forEachIndexed { index, window ->
+            if (index < existing.size) {
+                existing[index].apply {
+                    startTime = window.startTime
+                    endTime = window.endTime
+                    sortOrder = index
+                }
+            } else {
+                event.timeSlots.add(
+                    EventTimeSlot().apply {
+                        this.event = event
+                        this.startTime = window.startTime
+                        this.endTime = window.endTime
+                        this.sortOrder = index
+                        this.createdBy = userId
+                    },
+                )
+            }
         }
+        if (existing.size > windows.size) {
+            event.timeSlots.removeAll(existing.drop(windows.size).toSet())
+        }
+    }
+
+    private fun syncDenormalizedSchedule(event: Event) {
+        val first = event.timeSlots.minWithOrNull(compareBy({ it.sortOrder }, { it.startTime })) ?: return
+        event.startTime = first.startTime
+        event.endTime = first.endTime
     }
 
     private fun isDiscoverable(event: Event, interestGroupId: UUID?): Boolean {

@@ -601,6 +601,52 @@ class EventControllerIntegrationTest(
         ).totalElements shouldBe 1
     }
 
+    test("should create event with multiple time slots") {
+        preparePersonalizedTest()
+        stubCreateTag("workshop")
+        val createResponse = mockMvc
+            .post("/api/events") {
+                with(jwtFor(testUserId))
+                content = jsonMapper.writeValueAsString(
+                    mapOf(
+                        "name" to "Weekend workshop",
+                        "description" to "Morning and evening sessions",
+                        "interestGroups" to listOf(testInterestGroupId),
+                        "tags" to listOf(mapOf("name" to "workshop", "type" to "TOPIC")),
+                        "visibility" to "PUBLIC",
+                        "links" to emptyList<Any>(),
+                        "timeSlots" to listOf(
+                            mapOf(
+                                "startTime" to "2030-06-01T10:00:00",
+                                "endTime" to "2030-06-01T12:00:00",
+                            ),
+                            mapOf(
+                                "startTime" to "2030-06-01T18:00:00",
+                                "endTime" to "2030-06-01T20:00:00",
+                            ),
+                        ),
+                    ),
+                )
+                contentType = APPLICATION_JSON
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name", `is`("Weekend workshop"))
+                jsonPath("$.timeSlots.length()", `is`(2))
+                jsonPath("$.timeSlots[0].startTime", `is`("2030-06-01T10:00:00"))
+                jsonPath("$.timeSlots[1].startTime", `is`("2030-06-01T18:00:00"))
+                jsonPath("$.startTime", `is`("2030-06-01T10:00:00"))
+                jsonPath("$.endTime", `is`("2030-06-01T12:00:00"))
+            }
+            .toEventResponse(jsonMapper)
+
+        eventOccurrenceRepository.findByEventIdOrderByStartTimeAsc(
+            createResponse.id!!,
+            PageRequest.of(0, 10),
+        ).totalElements shouldBe 2
+    }
+
     test("should exclude schedule conflicts when schedule=true") {
         preparePersonalizedTest()
         val busyTagId = UUID.randomUUID()

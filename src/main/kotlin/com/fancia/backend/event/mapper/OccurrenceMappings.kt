@@ -11,5 +11,6 @@ fun EventOccurrence.toDto(): EventOccurrenceResponse {
         startTime = startTime,
         endTime = endTime,
         status = status,
+        timeSlotId = timeSlot?.id,
     )
 }

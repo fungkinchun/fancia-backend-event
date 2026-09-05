@@ -4,6 +4,7 @@ import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.shared.event.core.entity.EventOccurrence
 import com.fancia.backend.shared.event.core.entity.EventParticipant
 import com.fancia.backend.shared.event.core.entity.EventParticipantId
+import com.fancia.backend.shared.event.core.entity.EventTimeSlot
 import com.fancia.backend.shared.event.core.dto.EventOccurrenceResponse
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.enums.OccurrenceStatus
@@ -29,9 +30,11 @@ class EventOccurrenceService(
         startTime: LocalDateTime,
         endTime: LocalDateTime,
         hostUserId: UUID,
+        timeSlot: EventTimeSlot? = null,
     ): EventOccurrence {
         val occurrence = EventOccurrence().apply {
             this.event = event
+            this.timeSlot = timeSlot
             this.startTime = startTime
             this.endTime = endTime
             this.status = OccurrenceStatus.SCHEDULED
