@@ -34,6 +34,19 @@ interface ReservationRepository : JpaRepository<Reservation, ReservationId> {
 
     @Query(
         """
+        select case when count(r) > 0 then true else false end
+        from Reservation r
+        where r.occurrence.event.id = :eventId
+          and r.id.userId = :userId
+        """,
+    )
+    fun existsByEventIdAndUserId(
+        @Param("eventId") eventId: UUID,
+        @Param("userId") userId: UUID,
+    ): Boolean
+
+    @Query(
+        """
         select count(r) from Reservation r
         where r.id.occurrenceId = :occurrenceId
           and r.tierId = :tierId

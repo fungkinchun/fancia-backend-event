@@ -20,6 +20,7 @@ import com.fancia.backend.shared.event.core.entity.EventParticipant
 import com.fancia.backend.shared.event.core.entity.EventParticipantId
 import com.fancia.backend.shared.event.core.entity.Reservation
 import com.fancia.backend.shared.event.core.entity.ReservationId
+import com.fancia.backend.shared.event.core.enums.EventVisibility
 import com.fancia.backend.shared.event.core.enums.EventRole
 import com.fancia.backend.shared.event.core.enums.ReservationStatus
 import com.fancia.backend.shared.event.core.exception.EventNotFoundException
@@ -137,10 +138,12 @@ class ReservationService(
         occurrenceId: UUID,
         request: @Valid CreateReservationRequest,
         jwt: Jwt,
+        invite: String? = null,
     ): ReservationResponse {
         val currentUserId = jwt.userId()
         val event = eventRepository.findByIdOrNull(eventId)
             ?: throw EventNotFoundException(eventId)
+        assertPrivateEventJoinAllowed(event, currentUserId, invite)
         val occurrence = eventOccurrenceService.getOccurrence(eventId, occurrenceId)
         reservationRepository.findByIdOccurrenceIdAndIdUserId(occurrenceId, currentUserId)?.let {
             ensureCheckInToken(it)
@@ -521,6 +524,16 @@ class ReservationService(
             this.role = EventRole.GUEST
         }
         occurrence.participants.add(participant)
+    }
+
+    private fun assertPrivateEventJoinAllowed(event: Event, userId: UUID, invite: String?) {
+        if (event.visibility != EventVisibility.PRIVATE) return
+        if (userId == event.createdBy) return
+        val token = event.inviteToken
+        if (!token.isNullOrBlank() && !invite.isNullOrBlank() && token == invite) return
+        val eventId = event.id ?: return
+        if (reservationRepository.existsByEventIdAndUserId(eventId, userId)) return
+        throw EventNotFoundException(eventId)
     }
 
     private fun Jwt.userId(): UUID =

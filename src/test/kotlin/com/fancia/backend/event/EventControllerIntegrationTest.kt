@@ -305,7 +305,7 @@ class EventControllerIntegrationTest(
             }
     }
 
-    test("should not list private events but allow direct access by id") {
+    test("should not list private events; direct access needs invite or creator") {
         val secretTagId = stubCreateTag("secret")
         val createResponse = mockMvc
             .post("/api/events") {
@@ -328,11 +328,14 @@ class EventControllerIntegrationTest(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.visibility", `is`("PRIVATE"))
+                jsonPath("$.inviteToken").exists()
             }
             .andReturn()
             .response
             .contentAsString
-        val createdPrivateEventId = jsonMapper.readTree(createResponse).get("id").asText()
+        val created = jsonMapper.readTree(createResponse)
+        val createdPrivateEventId = created.get("id").asText()
+        val inviteToken = created.get("inviteToken").asText()
 
         mockMvc
             .get("/api/events?tagIds=$secretTagId&page=0&size=10") {
@@ -348,9 +351,28 @@ class EventControllerIntegrationTest(
                 accept = APPLICATION_JSON
             }
             .andExpect {
+                status { isNotFound() }
+            }
+
+        mockMvc
+            .get("/api/events/$createdPrivateEventId") {
+                param("invite", inviteToken)
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
                 status { isOk() }
                 jsonPath("$.name", `is`("Secret Event"))
                 jsonPath("$.visibility", `is`("PRIVATE"))
+            }
+
+        mockMvc
+            .get("/api/events/$createdPrivateEventId") {
+                with(jwt().jwt { it.claim("userId", testUserId) })
+                accept = APPLICATION_JSON
+            }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.inviteToken", `is`(inviteToken))
             }
     }
 

@@ -88,7 +88,7 @@ class EventController(
     @GetMapping("/{ref}")
     @Operation(
         summary = "Get event by id or slug",
-        description = "Returns an event by UUID or slug. Private and group events are accessible via direct link."
+        description = "Returns an event by UUID or slug."
     )
     @ApiResponses(
         value = [
@@ -98,9 +98,10 @@ class EventController(
     )
     fun getEvent(
         @PathVariable ref: String,
+        @RequestParam(required = false) invite: String?,
         @AuthenticationPrincipal jwt: Jwt?,
     ): ResponseEntity<EventResponse> {
-        return ResponseEntity.ok(eventService.findByIdOrSlug(ref, jwt))
+        return ResponseEntity.ok(eventService.findByIdOrSlug(ref, jwt, invite))
     }
 
     @GetMapping

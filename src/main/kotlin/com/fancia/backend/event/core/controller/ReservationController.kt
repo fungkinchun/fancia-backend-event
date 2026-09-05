@@ -80,10 +80,11 @@ class ReservationController(
     fun createReservation(
         @PathVariable eventId: UUID,
         @PathVariable occurrenceId: UUID,
+        @RequestParam(required = false) invite: String?,
         @RequestBody @Valid request: CreateReservationRequest,
         @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<ReservationResponse> {
-        return ResponseEntity.ok(reservationService.create(eventId, occurrenceId, request, jwt))
+        return ResponseEntity.ok(reservationService.create(eventId, occurrenceId, request, jwt, invite))
     }
 
     @PatchMapping("/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations")

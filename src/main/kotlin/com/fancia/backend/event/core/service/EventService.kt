@@ -8,6 +8,7 @@ import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.shared.event.core.entity.EventTimeSlot
 import com.fancia.backend.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.event.core.repository.ReservationRepository
 import com.fancia.backend.event.core.support.BusyOccurrence
 import com.fancia.backend.shared.event.core.support.EventTimeSlotSchedule
 import com.fancia.backend.shared.event.core.support.RecurringEventVisibility
@@ -18,6 +19,7 @@ import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.core.exception.PremiumFeatureLimitException
+import com.fancia.backend.shared.common.core.utils.InviteTokens
 import com.fancia.backend.shared.common.core.utils.Slugify
 import com.fancia.backend.shared.common.tag.core.dto.CreateTagsRequest
 import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest
@@ -53,6 +55,7 @@ import java.util.*
 class EventService(
     private val eventRepository: EventRepository,
     private val eventOccurrenceRepository: EventOccurrenceRepository,
+    private val reservationRepository: ReservationRepository,
     private val eventOccurrenceService: EventOccurrenceService,
     private val eventTicketTierService: EventTicketTierService,
     private val commonServiceClient: CommonServiceClient,
@@ -84,17 +87,23 @@ class EventService(
         return eventRepository.findByIdAndCreatedBy(id, createdBy)
     }
 
-    fun findByIdOrSlug(ref: String, jwt: Jwt? = null): EventResponse {
-        val event = resolveByIdOrSlug(ref)
+    fun findByIdOrSlug(ref: String, jwt: Jwt? = null, invite: String? = null): EventResponse {
+        val event = syncInviteToken(resolveByIdOrSlug(ref))
+        assertCanAccess(event, jwt, invite)
         val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
         enrichSaved(response, jwt)
+        exposeInviteTokenIfCreator(response, event, jwt)
         return response
     }
 
-    fun findById(id: UUID, jwt: Jwt? = null): EventResponse {
-        val event = eventRepository.findById(id).orElseThrow { EventNotFoundException(id) }
+    fun findById(id: UUID, jwt: Jwt? = null, invite: String? = null): EventResponse {
+        val event = syncInviteToken(
+            eventRepository.findById(id).orElseThrow { EventNotFoundException(id) },
+        )
+        assertCanAccess(event, jwt, invite)
         val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
         enrichSaved(response, jwt)
+        exposeInviteTokenIfCreator(response, event, jwt)
         return response
     }
 
@@ -153,6 +162,7 @@ class EventService(
             applyTags(it.tags, request.tags)
             eventLocationResolver.apply(it, request.location)
             applyRecurrence(it, request.recurrence)
+            syncInviteTokenInPlace(it)
             val savedEvent = eventRepository.save(it)
             replaceTimeSlots(savedEvent, scheduleWindows, currentUserId)
             syncDenormalizedSchedule(savedEvent)
@@ -177,7 +187,9 @@ class EventService(
                     )
                 }
             invalidateEventCaches()
-            return eventOccurrenceService.toUpcomingResponse(savedEvent, LocalDateTime.now())
+            return eventOccurrenceService.toUpcomingResponse(savedEvent, LocalDateTime.now()).also {
+                exposeInviteTokenIfCreator(it, savedEvent, jwt)
+            }
         }
     }
 
@@ -205,6 +217,7 @@ class EventService(
                 }
                 replaceTimeSlots(this, scheduleWindows, currentUserId)
                 syncDenormalizedSchedule(this)
+                syncInviteTokenInPlace(this)
             },
         ).let { updated ->
             updated.timeSlots.sortedBy { slot -> slot.sortOrder }.forEach { slot ->
@@ -220,7 +233,9 @@ class EventService(
                 }
             }
             invalidateEventCaches()
-            eventOccurrenceService.toUpcomingResponse(updated, LocalDateTime.now())
+            eventOccurrenceService.toUpcomingResponse(updated, LocalDateTime.now()).also {
+                exposeInviteTokenIfCreator(it, updated, jwt)
+            }
         }
     }
 
@@ -715,4 +730,55 @@ class EventService(
         val user = runCatching { userServiceClient.getUser(targetUserId) }.getOrNull() ?: return false
         return user.eventsCount != null
     }
+
+    private fun assertCanAccess(event: Event, jwt: Jwt?, invite: String?) {
+        if (event.visibility != EventVisibility.PRIVATE) return
+        val userId = jwtUserId(jwt)
+        if (userId != null && userId == event.createdBy) return
+        val token = event.inviteToken
+        if (!token.isNullOrBlank() && !invite.isNullOrBlank() && token == invite) return
+        val eventId = event.id
+        if (userId != null && eventId != null &&
+            reservationRepository.existsByEventIdAndUserId(eventId, userId)
+        ) {
+            return
+        }
+        throw EventNotFoundException(event.id ?: event.slug)
+    }
+
+    fun assertCanJoin(event: Event, jwt: Jwt, invite: String?) {
+        assertCanAccess(event, jwt, invite)
+    }
+
+    private fun syncInviteToken(event: Event): Event {
+        if (!syncInviteTokenInPlace(event)) return event
+        return eventRepository.save(event)
+    }
+
+    private fun syncInviteTokenInPlace(event: Event): Boolean {
+        if (event.visibility == EventVisibility.PRIVATE) {
+            if (event.inviteToken.isNullOrBlank()) {
+                event.inviteToken = InviteTokens.generate()
+                return true
+            }
+            return false
+        }
+        if (event.inviteToken != null) {
+            event.inviteToken = null
+            return true
+        }
+        return false
+    }
+
+    private fun exposeInviteTokenIfCreator(response: EventResponse, event: Event, jwt: Jwt?) {
+        val userId = jwtUserId(jwt)
+        if (userId != null && userId == event.createdBy && event.visibility == EventVisibility.PRIVATE) {
+            response.inviteToken = event.inviteToken
+        } else {
+            response.inviteToken = null
+        }
+    }
+
+    private fun jwtUserId(jwt: Jwt?): UUID? =
+        jwt?.getClaimAsString("userId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 }
