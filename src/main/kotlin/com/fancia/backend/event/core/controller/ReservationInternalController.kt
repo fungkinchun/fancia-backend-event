@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/internal/events/{eventId}/occurrences/{occurrenceId}/reservations/{userId}")
+@RequestMapping("/internal/v1/events/{eventId}/occurrences/{occurrenceId}/reservations/{userId}")
 @Hidden
 class ReservationInternalController(
     private val reservationService: ReservationService,

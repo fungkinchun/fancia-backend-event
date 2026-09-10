@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import java.util.*
 
-@FeignClient(name = "venue-service", path = "/api", configuration = [FeignConfig::class])
+@FeignClient(name = "venue-service", path = "/api/v1", configuration = [FeignConfig::class])
 interface VenueServiceClient {
     @GetMapping("/venues/{id}")
     fun getVenue(@PathVariable id: UUID): VenueResponse

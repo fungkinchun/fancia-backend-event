@@ -16,7 +16,31 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${AUTH_SERVICE_URL:auth-service}
-          jwk-set-uri: ${AUTH_SERVICE_URL:auth-service}/oauth2/jwks
+  mvc:
+    cors:
+      mappings:
+        "[/**]":
+          allowed-origins:
+            - "http://localhost:3000"
+            - "https://fancia.co.uk"
+            - "https://www.fancia.co.uk"
+            - "https://dev.fancia.co.uk"
+          allowed-methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+            - OPTIONS
+          allowed-headers:
+            - Authorization
+            - Content-Type
+            - Accept
+          exposed-headers:
+            - Authorization
+            - Content-Type
+          allow-credentials: true
+          max-age: 3600
   datasource:
     url: ${DATABASE_URL}
     username: ${AWS_RDS_SECRET_NAME:${DATABASE_USERNAME}}
@@ -128,7 +152,7 @@ spring:
       gis_admin_password: ${GIS_ADMIN_PASSWORD}
 app:
   application-name: ${PROJECT_NAME}-backend-${REPO_NAME}
-  base-url: ${DOMAIN_NAME}/${REPO_NAME}/api
+  base-url: ${DOMAIN_NAME}/${REPO_NAME}/api/v1
   login-page-url: ${AUTH_SERVICE_URL:auth-service}/login
   s3:
     bucket-name: ${BUCKET_NAME}
@@ -147,7 +171,6 @@ management:
     prometheus:
       enabled: true
 
-# Temporary: diagnose Bearer JWT 401 on permitAll GETs (remove after fix)
 logging:
   level:
     org.springframework.security: DEBUG

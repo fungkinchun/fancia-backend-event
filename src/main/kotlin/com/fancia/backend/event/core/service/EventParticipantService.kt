@@ -1,8 +1,8 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.EventParticipantRepository
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.shared.event.core.dto.EventParticipantResponse
 import com.fancia.backend.shared.event.core.enums.EventRole

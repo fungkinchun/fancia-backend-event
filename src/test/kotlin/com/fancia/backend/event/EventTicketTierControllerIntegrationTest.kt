@@ -1,7 +1,7 @@
 package com.fancia.backend.event
 
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.EventTicketTierRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
@@ -58,7 +58,7 @@ class EventTicketTierControllerIntegrationTest(
 
     fun stubCreateTag(name: String) {
         stubFor(
-            post(urlPathEqualTo("/api/tags"))
+            post(urlPathEqualTo("/api/v1/tags"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -86,7 +86,7 @@ class EventTicketTierControllerIntegrationTest(
 
     fun stubPayoutReady(userId: UUID, ready: Boolean) {
         stubFor(
-            get(urlPathEqualTo("/internal/connect/accounts/$userId"))
+            get(urlPathEqualTo("/internal/v1/connect/accounts/$userId"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -111,7 +111,7 @@ class EventTicketTierControllerIntegrationTest(
 
     fun createEvent(hostId: UUID, approvalRequired: Boolean = true): UUID {
         stubCreateTag("tickets")
-        val body = mockMvc.post("/api/events") {
+        val body = mockMvc.post("/api/v1/events") {
             with(jwtFor(hostId))
             content = jsonMapper.writeValueAsString(
                 mapOf(
@@ -146,7 +146,7 @@ class EventTicketTierControllerIntegrationTest(
         stubCreateTag("inline-tickets")
         stubPayoutReady(hostId, ready = true)
 
-        val body = mockMvc.post("/api/events") {
+        val body = mockMvc.post("/api/v1/events") {
             with(jwtFor(hostId))
             content = jsonMapper.writeValueAsString(
                 mapOf(
@@ -190,7 +190,7 @@ class EventTicketTierControllerIntegrationTest(
         val hostId = UUID.randomUUID()
         val eventId = createEvent(hostId)
 
-        mockMvc.post("/api/events/{eventId}/ticket-tiers", eventId) {
+        mockMvc.post("/api/v1/events/{eventId}/ticket-tiers", eventId) {
             with(jwtFor(hostId))
             content = jsonMapper.writeValueAsString(
                 mapOf(
@@ -208,7 +208,7 @@ class EventTicketTierControllerIntegrationTest(
             jsonPath("$.id", `is`(notNullValue()))
         }
 
-        mockMvc.get("/api/events/{eventId}/ticket-tiers", eventId) {
+        mockMvc.get("/api/v1/events/{eventId}/ticket-tiers", eventId) {
             accept = APPLICATION_JSON
         }.andExpect {
             status { isOk() }
@@ -221,7 +221,7 @@ class EventTicketTierControllerIntegrationTest(
         val eventId = createEvent(hostId)
         stubPayoutReady(hostId, ready = false)
 
-        mockMvc.post("/api/events/{eventId}/ticket-tiers", eventId) {
+        mockMvc.post("/api/v1/events/{eventId}/ticket-tiers", eventId) {
             with(jwtFor(hostId))
             content = jsonMapper.writeValueAsString(
                 mapOf(
@@ -244,7 +244,7 @@ class EventTicketTierControllerIntegrationTest(
         val eventId = createEvent(hostId, approvalRequired = true)
         val occurrenceId = firstOccurrenceId(eventId)
 
-        val tierBody = mockMvc.post("/api/events/{eventId}/ticket-tiers", eventId) {
+        val tierBody = mockMvc.post("/api/v1/events/{eventId}/ticket-tiers", eventId) {
             with(jwtFor(hostId))
             content = jsonMapper.writeValueAsString(
                 mapOf("name" to "Free", "priceMinor" to 0, "currency" to "gbp"),
@@ -255,7 +255,7 @@ class EventTicketTierControllerIntegrationTest(
         val tierId = UUID.fromString(jsonMapper.readTree(tierBody).get("id").asText())
 
         mockMvc.post(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/reservations",
             eventId,
             occurrenceId,
         ) {
@@ -277,7 +277,7 @@ class EventTicketTierControllerIntegrationTest(
         }
 
         mockMvc.patch(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
             eventId,
             occurrenceId,
             guestId,
@@ -301,7 +301,7 @@ class EventTicketTierControllerIntegrationTest(
         val occurrenceId = firstOccurrenceId(eventId)
         stubPayoutReady(hostId, ready = true)
 
-        val tierBody = mockMvc.post("/api/events/{eventId}/ticket-tiers", eventId) {
+        val tierBody = mockMvc.post("/api/v1/events/{eventId}/ticket-tiers", eventId) {
             with(jwtFor(hostId))
             content = jsonMapper.writeValueAsString(
                 mapOf(
@@ -320,7 +320,7 @@ class EventTicketTierControllerIntegrationTest(
         val tierId = UUID.fromString(jsonMapper.readTree(tierBody).get("id").asText())
 
         mockMvc.post(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/reservations",
             eventId,
             occurrenceId,
         ) {
@@ -341,7 +341,7 @@ class EventTicketTierControllerIntegrationTest(
         }
 
         mockMvc.get(
-            "/internal/events/{eventId}/occurrences/{occurrenceId}/reservations/{userId}/checkout",
+            "/internal/v1/events/{eventId}/occurrences/{occurrenceId}/reservations/{userId}/checkout",
             eventId,
             occurrenceId,
             guestId,
@@ -355,7 +355,7 @@ class EventTicketTierControllerIntegrationTest(
         }
 
         mockMvc.post(
-            "/internal/events/{eventId}/occurrences/{occurrenceId}/reservations/{userId}/paid",
+            "/internal/v1/events/{eventId}/occurrences/{occurrenceId}/reservations/{userId}/paid",
             eventId,
             occurrenceId,
             guestId,
@@ -378,7 +378,7 @@ class EventTicketTierControllerIntegrationTest(
         val occurrenceId = firstOccurrenceId(eventId)
         stubPayoutReady(hostId, ready = true)
 
-        val tierBody = mockMvc.post("/api/events/{eventId}/ticket-tiers", eventId) {
+        val tierBody = mockMvc.post("/api/v1/events/{eventId}/ticket-tiers", eventId) {
             with(jwtFor(hostId))
             content = jsonMapper.writeValueAsString(
                 mapOf("name" to "Standard", "priceMinor" to 2000, "currency" to "gbp"),
@@ -389,7 +389,7 @@ class EventTicketTierControllerIntegrationTest(
         val tierId = UUID.fromString(jsonMapper.readTree(tierBody).get("id").asText())
 
         mockMvc.post(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/reservations",
             eventId,
             occurrenceId,
         ) {
@@ -405,7 +405,7 @@ class EventTicketTierControllerIntegrationTest(
         }
 
         stubFor(
-            post(urlPathEqualTo("/internal/checkout/sessions"))
+            post(urlPathEqualTo("/internal/v1/checkout/sessions"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -426,7 +426,7 @@ class EventTicketTierControllerIntegrationTest(
         )
 
         mockMvc.post(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/reservations/checkout",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/reservations/checkout",
             eventId,
             occurrenceId,
         ) {

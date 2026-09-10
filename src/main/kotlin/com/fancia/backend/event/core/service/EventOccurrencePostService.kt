@@ -1,6 +1,6 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.event.external.CommonInternalClient
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.moderation.core.support.PostVisibility

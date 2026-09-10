@@ -20,12 +20,17 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
         "com.fancia.backend.shared.common.core.entity",
         "com.fancia.backend.shared.common.moderation.core.entity",
         "com.fancia.backend.shared.common.saved.core.entity",
+        "com.fancia.backend.shared.common.rating.core.entity",
         "com.fancia.backend.event.core.entity",
     ]
 )
 @EnableJpaRepositories(
     basePackages = [
         "com.fancia.backend.event.core.repository",
+        "com.fancia.backend.shared.event.core.repository",
+        "com.fancia.backend.shared.common.moderation.core.repository",
+        "com.fancia.backend.shared.common.saved.core.repository",
+        "com.fancia.backend.shared.common.rating.core.repository",
     ]
 )
 @SpringBootApplication(scanBasePackages = ["com.fancia.backend.event"])

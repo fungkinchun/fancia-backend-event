@@ -14,7 +14,7 @@ import java.util.UUID
 
 @FeignClient(
     name = "payment-internal-service",
-    path = "/internal",
+    path = "/internal/v1",
     configuration = [FeignConfig::class],
 )
 interface PaymentInternalClient {

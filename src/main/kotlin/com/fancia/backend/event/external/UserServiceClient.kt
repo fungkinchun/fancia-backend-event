@@ -16,7 +16,7 @@ import java.util.UUID
 
 @FeignClient(
     name = "user-service",
-    path = "/api",
+    path = "/api/v1",
     configuration = [FeignConfig::class],
 )
 interface UserServiceClient {

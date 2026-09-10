@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/events/{eventId}/ticket-tiers")
+@RequestMapping("/api/v1/events/{eventId}/ticket-tiers")
 @Tag(name = "Event Ticket Tiers", description = "Priced ticket tiers for an event")
 @SecurityRequirement(name = "bearerAuth")
 class EventTicketTierController(

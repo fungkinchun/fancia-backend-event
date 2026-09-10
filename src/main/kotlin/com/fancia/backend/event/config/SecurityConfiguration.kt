@@ -18,8 +18,8 @@ class SecurityConfiguration {
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http.authorizeHttpRequests { customizer ->
-            customizer.requestMatchers(HttpMethod.GET, "/internal/events/*/occurrences/*/reservations/*/checkout").permitAll()
-            customizer.requestMatchers(HttpMethod.POST, "/internal/events/*/occurrences/*/reservations/*/paid").permitAll()
+            customizer.requestMatchers(HttpMethod.GET, "/internal/v1/events/*/occurrences/*/reservations/*/checkout").permitAll()
+            customizer.requestMatchers(HttpMethod.POST, "/internal/v1/events/*/occurrences/*/reservations/*/paid").permitAll()
             customizer.requestMatchers("/api/blocked", "/api/blocked/**").authenticated()
             customizer.requestMatchers("/api/reports", "/api/reports/**").authenticated()
             customizer.requestMatchers(HttpMethod.GET, "/api/events/me/saved").authenticated()

@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*
 import java.util.*
 
 @RestController
-@RequestMapping("/api/events")
+@RequestMapping("/api/v1/events")
 @Tag(name = "Events", description = "Event endpoints")
 @SecurityRequirement(name = "bearerAuth")
 class EventController(

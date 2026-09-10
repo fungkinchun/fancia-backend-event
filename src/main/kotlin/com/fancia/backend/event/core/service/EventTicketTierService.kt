@@ -1,7 +1,7 @@
 package com.fancia.backend.event.core.service
 
 import com.fancia.backend.event.core.entity.EventTicketTier
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.EventTicketTierRepository
 import com.fancia.backend.event.external.PaymentInternalClient
 import com.fancia.backend.event.mapper.applyTo

@@ -1,7 +1,7 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.repository.EventRepository
-import com.fancia.backend.event.core.repository.SavedResourceRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
+import com.fancia.backend.shared.common.saved.core.repository.SavedResourceRepository
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException
 import com.fancia.backend.shared.common.saved.core.dto.SavedResourceResponse
 import com.fancia.backend.shared.common.saved.core.entity.SavedResource

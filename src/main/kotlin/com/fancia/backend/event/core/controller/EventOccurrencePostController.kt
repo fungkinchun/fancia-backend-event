@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*
 import java.util.*
 
 @RestController
-@RequestMapping("/api/events/{eventId}/occurrences/{occurrenceId}/posts")
+@RequestMapping("/api/v1/events/{eventId}/occurrences/{occurrenceId}/posts")
 @Tag(name = "Event Occurrence Posts", description = "Posts on event occurrences")
 @SecurityRequirement(name = "bearerAuth")
 class EventOccurrencePostController(

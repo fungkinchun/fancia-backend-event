@@ -1,6 +1,6 @@
 package com.fancia.backend.event.core.service
 
-import com.fancia.backend.event.core.repository.ReportRepository
+import com.fancia.backend.shared.common.moderation.core.repository.ReportRepository
 import com.fancia.backend.event.external.UserServiceClient
 import com.fancia.backend.shared.common.core.exception.DomainException
 import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationException

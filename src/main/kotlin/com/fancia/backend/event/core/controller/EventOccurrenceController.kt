@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/events")
+@RequestMapping("/api/v1/events")
 @Tag(name = "Event Occurrences", description = "Event occurrence endpoints")
 @SecurityRequirement(name = "bearerAuth")
 class EventOccurrenceController(

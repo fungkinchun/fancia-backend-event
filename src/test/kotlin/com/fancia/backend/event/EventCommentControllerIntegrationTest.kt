@@ -1,7 +1,7 @@
 package com.fancia.backend.event
 
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.shared.common.comment.core.dto.CommentResponse
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.kotest.core.spec.style.FunSpec
@@ -47,7 +47,7 @@ class EventCommentControllerIntegrationTest(
     fun stubCreateTag(name: String): UUID {
         val tagId = UUID.randomUUID()
         stubFor(
-            post(urlPathEqualTo("/api/tags"))
+            post(urlPathEqualTo("/api/v1/tags"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -79,7 +79,7 @@ class EventCommentControllerIntegrationTest(
         val tagName = "test"
         stubCreateTag(tagName)
         val responseBody = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -128,7 +128,7 @@ class EventCommentControllerIntegrationTest(
             createdAt = null,
         )
         stubFor(
-            post(urlPathEqualTo("/internal/comments"))
+            post(urlPathEqualTo("/internal/v1/comments"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -138,7 +138,7 @@ class EventCommentControllerIntegrationTest(
         )
 
         mockMvc
-            .post("/api/events/$eventId/occurrences/$occurrenceId/comments") {
+            .post("/api/v1/events/$eventId/occurrences/$occurrenceId/comments") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -158,7 +158,7 @@ class EventCommentControllerIntegrationTest(
             }
 
         verify(
-            postRequestedFor(urlPathEqualTo("/internal/comments"))
+            postRequestedFor(urlPathEqualTo("/internal/v1/comments"))
                 .withRequestBody(matchingJsonPath("$.targetId", equalTo(occurrenceId.toString())))
                 .withRequestBody(matchingJsonPath("$.resourceId", equalTo(occurrenceId.toString())))
                 .withRequestBody(matchingJsonPath("$.body", equalTo("Great session"))),
@@ -180,7 +180,7 @@ class EventCommentControllerIntegrationTest(
             createdAt = null,
         )
         stubFor(
-            post(urlPathEqualTo("/internal/comments"))
+            post(urlPathEqualTo("/internal/v1/comments"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -190,7 +190,7 @@ class EventCommentControllerIntegrationTest(
         )
 
         mockMvc
-            .post("/api/events/$eventId/occurrences/$occurrenceId/comments") {
+            .post("/api/v1/events/$eventId/occurrences/$occurrenceId/comments") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -209,7 +209,7 @@ class EventCommentControllerIntegrationTest(
             }
 
         verify(
-            postRequestedFor(urlPathEqualTo("/internal/comments"))
+            postRequestedFor(urlPathEqualTo("/internal/v1/comments"))
                 .withRequestBody(matchingJsonPath("$.targetId", equalTo(postId.toString())))
                 .withRequestBody(matchingJsonPath("$.resourceId", equalTo(occurrenceId.toString())))
                 .withRequestBody(matchingJsonPath("$.body", equalTo("Nice post"))),
@@ -222,7 +222,7 @@ class EventCommentControllerIntegrationTest(
         val userId = UUID.randomUUID()
 
         mockMvc
-            .post("/api/events/$missingEventId/occurrences/$missingOccurrenceId/comments") {
+            .post("/api/v1/events/$missingEventId/occurrences/$missingOccurrenceId/comments") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -236,7 +236,7 @@ class EventCommentControllerIntegrationTest(
             }
             .andExpect { status { isBadRequest() } }
 
-        verify(0, postRequestedFor(urlPathEqualTo("/internal/comments")))
+        verify(0, postRequestedFor(urlPathEqualTo("/internal/v1/comments")))
     }
 
     test("should list occurrence wall comments with targetId defaulting to occurrenceId") {
@@ -251,7 +251,7 @@ class EventCommentControllerIntegrationTest(
             "number" to 0,
         )
         stubFor(
-            get(urlPathEqualTo("/internal/comments"))
+            get(urlPathEqualTo("/internal/v1/comments"))
                 .withQueryParam("targetId", equalTo(occurrenceId.toString()))
                 .withQueryParam("resourceId", equalTo(occurrenceId.toString()))
                 .willReturn(
@@ -263,13 +263,13 @@ class EventCommentControllerIntegrationTest(
         )
 
         mockMvc
-            .get("/api/events/$eventId/occurrences/$occurrenceId/comments") {
+            .get("/api/v1/events/$eventId/occurrences/$occurrenceId/comments") {
                 accept = APPLICATION_JSON
             }
             .andExpect { status { isOk() } }
 
         verify(
-            getRequestedFor(urlPathEqualTo("/internal/comments"))
+            getRequestedFor(urlPathEqualTo("/internal/v1/comments"))
                 .withQueryParam("targetId", equalTo(occurrenceId.toString()))
                 .withQueryParam("resourceId", equalTo(occurrenceId.toString())),
         )
@@ -288,7 +288,7 @@ class EventCommentControllerIntegrationTest(
             "number" to 0,
         )
         stubFor(
-            get(urlPathEqualTo("/internal/comments"))
+            get(urlPathEqualTo("/internal/v1/comments"))
                 .withQueryParam("targetId", equalTo(postId.toString()))
                 .withQueryParam("resourceId", equalTo(occurrenceId.toString()))
                 .willReturn(
@@ -300,14 +300,14 @@ class EventCommentControllerIntegrationTest(
         )
 
         mockMvc
-            .get("/api/events/$eventId/occurrences/$occurrenceId/comments") {
+            .get("/api/v1/events/$eventId/occurrences/$occurrenceId/comments") {
                 param("targetId", postId.toString())
                 accept = APPLICATION_JSON
             }
             .andExpect { status { isOk() } }
 
         verify(
-            getRequestedFor(urlPathEqualTo("/internal/comments"))
+            getRequestedFor(urlPathEqualTo("/internal/v1/comments"))
                 .withQueryParam("targetId", equalTo(postId.toString()))
                 .withQueryParam("resourceId", equalTo(occurrenceId.toString())),
         )
@@ -326,7 +326,7 @@ class EventCommentControllerIntegrationTest(
             "number" to 0,
         )
         stubFor(
-            get(urlPathEqualTo("/internal/comments"))
+            get(urlPathEqualTo("/internal/v1/comments"))
                 .withQueryParam("targetId", equalTo(parentCommentId.toString()))
                 .withQueryParam("resourceId", equalTo(occurrenceId.toString()))
                 .willReturn(
@@ -338,14 +338,14 @@ class EventCommentControllerIntegrationTest(
         )
 
         mockMvc
-            .get("/api/events/$eventId/occurrences/$occurrenceId/comments") {
+            .get("/api/v1/events/$eventId/occurrences/$occurrenceId/comments") {
                 param("targetId", parentCommentId.toString())
                 accept = APPLICATION_JSON
             }
             .andExpect { status { isOk() } }
 
         verify(
-            getRequestedFor(urlPathEqualTo("/internal/comments"))
+            getRequestedFor(urlPathEqualTo("/internal/v1/comments"))
                 .withQueryParam("targetId", equalTo(parentCommentId.toString()))
                 .withQueryParam("resourceId", equalTo(occurrenceId.toString())),
         )
@@ -365,7 +365,7 @@ class EventCommentControllerIntegrationTest(
             createdAt = null,
         )
         stubFor(
-            get(urlPathEqualTo("/internal/comments/$commentId"))
+            get(urlPathEqualTo("/internal/v1/comments/$commentId"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -374,17 +374,17 @@ class EventCommentControllerIntegrationTest(
                 ),
         )
         stubFor(
-            post(urlPathEqualTo("/internal/comments/$commentId/likes"))
+            post(urlPathEqualTo("/internal/v1/comments/$commentId/likes"))
                 .willReturn(aResponse().withStatus(204)),
         )
 
         mockMvc
-            .post("/api/events/$eventId/occurrences/$occurrenceId/comments/$commentId/likes") {
+            .post("/api/v1/events/$eventId/occurrences/$occurrenceId/comments/$commentId/likes") {
                 with(jwt().jwt { it.claim("userId", userId) })
             }
             .andExpect { status { isNoContent() } }
 
-        verify(postRequestedFor(urlPathEqualTo("/internal/comments/$commentId/likes")))
+        verify(postRequestedFor(urlPathEqualTo("/internal/v1/comments/$commentId/likes")))
     }
 
     test("should forward unlike to common-internal") {
@@ -401,7 +401,7 @@ class EventCommentControllerIntegrationTest(
             createdAt = null,
         )
         stubFor(
-            get(urlPathEqualTo("/internal/comments/$commentId"))
+            get(urlPathEqualTo("/internal/v1/comments/$commentId"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -410,17 +410,17 @@ class EventCommentControllerIntegrationTest(
                 ),
         )
         stubFor(
-            delete(urlPathEqualTo("/internal/comments/$commentId/likes"))
+            delete(urlPathEqualTo("/internal/v1/comments/$commentId/likes"))
                 .willReturn(aResponse().withStatus(204)),
         )
 
         mockMvc
-            .delete("/api/events/$eventId/occurrences/$occurrenceId/comments/$commentId/likes") {
+            .delete("/api/v1/events/$eventId/occurrences/$occurrenceId/comments/$commentId/likes") {
                 with(jwt().jwt { it.claim("userId", userId) })
             }
             .andExpect { status { isNoContent() } }
 
-        verify(deleteRequestedFor(urlPathEqualTo("/internal/comments/$commentId/likes")))
+        verify(deleteRequestedFor(urlPathEqualTo("/internal/v1/comments/$commentId/likes")))
     }
 
     afterSpec {

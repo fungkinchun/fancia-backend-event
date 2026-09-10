@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.*
 
 @RestController
-@RequestMapping("/api/events")
+@RequestMapping("/api/v1/events")
 @Tag(name = "Event Participants", description = "Event participant endpoints")
 @SecurityRequirement(name = "bearerAuth")
 class EventParticipantController(

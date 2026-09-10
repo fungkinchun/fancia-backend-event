@@ -6,8 +6,8 @@ import com.fancia.backend.shared.common.redis.CachedPage
 import com.fancia.backend.shared.common.redis.RedisQueryCache
 import com.fancia.backend.shared.event.core.entity.Event
 import com.fancia.backend.shared.event.core.entity.EventTimeSlot
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
 import com.fancia.backend.event.core.support.BusyOccurrence
 import com.fancia.backend.shared.event.core.support.EventTimeSlotSchedule
@@ -21,6 +21,9 @@ import com.fancia.backend.shared.common.core.exception.InvalidAuthenticationExce
 import com.fancia.backend.shared.common.core.exception.PremiumFeatureLimitException
 import com.fancia.backend.shared.common.core.utils.InviteTokens
 import com.fancia.backend.shared.common.core.utils.Slugify
+import com.fancia.backend.shared.common.rating.core.enums.RatedResourceType
+import com.fancia.backend.shared.common.rating.core.repository.ResourceRatingRepository
+import com.fancia.backend.shared.common.rating.core.support.loadEnrichment
 import com.fancia.backend.shared.common.tag.core.dto.CreateTagsRequest
 import com.fancia.backend.shared.common.tag.core.dto.TagItemRequest
 import com.fancia.backend.shared.event.core.dto.CreateEventRequest
@@ -64,6 +67,7 @@ class EventService(
     private val smartMatchEventRanker: SmartMatchEventRanker,
     private val blockedResourceService: BlockedResourceService,
     private val savedResourceService: SavedResourceService,
+    private val resourceRatingRepository: ResourceRatingRepository,
     private val redisQueryCache: ObjectProvider<RedisQueryCache>,
 ) {
     fun listSavedEvents(jwt: Jwt, pageable: Pageable): Page<EventResponse> {
@@ -94,6 +98,7 @@ class EventService(
         assertNotBlocked(event, jwt)
         val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
         enrichSaved(response, jwt)
+        enrichRating(response, jwt)
         exposeInviteTokenIfCreator(response, event, jwt)
         return response
     }
@@ -106,6 +111,7 @@ class EventService(
         assertNotBlocked(event, jwt)
         val response = eventOccurrenceService.toUpcomingResponse(event, LocalDateTime.now())
         enrichSaved(response, jwt)
+        enrichRating(response, jwt)
         exposeInviteTokenIfCreator(response, event, jwt)
         return response
     }
@@ -118,6 +124,15 @@ class EventService(
             return
         }
         response.savedByCurrentUser = savedResourceService.isSaved(userId, eventId)
+    }
+
+    private fun enrichRating(response: EventResponse, jwt: Jwt?) {
+        val eventId = response.id ?: return
+        val userId = jwt?.getClaimAsString("userId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+        val enrichment = resourceRatingRepository.loadEnrichment(RatedResourceType.EVENT, eventId, userId)
+        response.averageRating = enrichment.averageRating
+        response.ratingCount = enrichment.ratingCount
+        response.currentUserRating = enrichment.currentUserRating
     }
 
     fun resolveByIdOrSlug(ref: String): Event {

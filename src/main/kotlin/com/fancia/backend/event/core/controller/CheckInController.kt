@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/events/{eventId}/occurrences/{occurrenceId}/check-ins")
+@RequestMapping("/api/v1/events/{eventId}/occurrences/{occurrenceId}/check-ins")
 @Tag(name = "Check-in")
 @SecurityRequirement(name = "bearerAuth")
 class CheckInController(

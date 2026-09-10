@@ -9,7 +9,7 @@ import com.fancia.backend.shared.event.core.dto.EventOccurrenceResponse
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.enums.OccurrenceStatus
 import com.fancia.backend.shared.event.core.exception.OccurrenceNotFoundException
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.shared.event.core.support.RecurringEventVisibility
 import com.fancia.backend.event.mapper.toDto
 import com.fancia.backend.shared.event.core.enums.EventRole

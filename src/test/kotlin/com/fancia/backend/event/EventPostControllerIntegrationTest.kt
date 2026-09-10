@@ -1,8 +1,8 @@
 package com.fancia.backend.event
 
 import com.fancia.backend.shared.common.post.core.enums.PostStatus
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.shared.common.post.core.dto.PostMediaResponse
 import com.fancia.backend.shared.common.post.core.dto.PostResponse
 import com.fancia.backend.shared.common.post.core.enums.PostMediaType
@@ -50,7 +50,7 @@ class EventPostControllerIntegrationTest(
     fun stubCreateTag(name: String): UUID {
         val tagId = UUID.randomUUID()
         stubFor(
-            post(urlPathEqualTo("/api/tags"))
+            post(urlPathEqualTo("/api/v1/tags"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -82,7 +82,7 @@ class EventPostControllerIntegrationTest(
         val tagName = "test"
         stubCreateTag(tagName)
         val responseBody = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -143,7 +143,7 @@ class EventPostControllerIntegrationTest(
             createdAt = null,
         )
         stubFor(
-            post(urlPathEqualTo("/internal/posts"))
+            post(urlPathEqualTo("/internal/v1/posts"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -166,7 +166,7 @@ class EventPostControllerIntegrationTest(
             "status" to "FEATURED",
         )
         val responseBody = mockMvc
-            .post("/api/events/$eventId/occurrences/$occurrenceId/posts") {
+            .post("/api/v1/events/$eventId/occurrences/$occurrenceId/posts") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
@@ -186,7 +186,7 @@ class EventPostControllerIntegrationTest(
         response.status shouldBe PostStatus.FEATURED
 
         verify(
-            postRequestedFor(urlPathEqualTo("/internal/posts"))
+            postRequestedFor(urlPathEqualTo("/internal/v1/posts"))
                 .withRequestBody(matchingJsonPath("$.targetId", equalTo(occurrenceId.toString())))
                 .withRequestBody(matchingJsonPath("$.authorUserId", equalTo(userId.toString())))
                 .withRequestBody(matchingJsonPath("$.status", equalTo("FEATURED")))
@@ -200,7 +200,7 @@ class EventPostControllerIntegrationTest(
         val userId = UUID.randomUUID()
 
         mockMvc
-            .post("/api/events/$missingEventId/occurrences/$missingOccurrenceId/posts") {
+            .post("/api/v1/events/$missingEventId/occurrences/$missingOccurrenceId/posts") {
                 with(jwt().jwt { it.claim("userId", userId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -214,7 +214,7 @@ class EventPostControllerIntegrationTest(
             }
             .andExpect { status { isBadRequest() } }
 
-        verify(0, postRequestedFor(urlPathEqualTo("/internal/posts")))
+        verify(0, postRequestedFor(urlPathEqualTo("/internal/v1/posts")))
     }
 
     afterSpec {

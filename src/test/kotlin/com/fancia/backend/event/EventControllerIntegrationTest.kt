@@ -1,8 +1,8 @@
 package com.fancia.backend.event
 
 import com.fancia.backend.shared.event.core.entity.Event
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
-import com.fancia.backend.event.core.repository.EventRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventRepository
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.event.core.dto.EventResponse
 import com.fancia.backend.shared.event.core.enums.RecurrenceFrequency
@@ -57,7 +57,7 @@ class EventControllerIntegrationTest(
     fun refreshTagLookupStubs() {
         val tags = tagRegistry.distinct()
         stubFor(
-            get(urlPathEqualTo("/api/tags/ids"))
+            get(urlPathEqualTo("/api/v1/tags/ids"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -76,7 +76,7 @@ class EventControllerIntegrationTest(
                 ),
         )
         stubFor(
-            get(urlPathEqualTo("/api/tags"))
+            get(urlPathEqualTo("/api/v1/tags"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -102,7 +102,7 @@ class EventControllerIntegrationTest(
             body["eventsCount"] = 0
         }
         stubFor(
-            get(urlPathEqualTo("/api/users/$userId"))
+            get(urlPathEqualTo("/api/v1/users/$userId"))
                 .willReturn(
                     aResponse()
                         .withStatus(200)
@@ -115,7 +115,7 @@ class EventControllerIntegrationTest(
     fun stubTag(tagId: UUID, name: String) {
         tagRegistry.add(tagId to name)
         stubFor(
-            post(urlPathEqualTo("/api/tags"))
+            post(urlPathEqualTo("/api/v1/tags"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -172,7 +172,7 @@ class EventControllerIntegrationTest(
             location?.let { put("location", it) }
         }
         return mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwtFor(createdBy))
                 content = jsonMapper.writeValueAsString(requestBody)
                 contentType = APPLICATION_JSON
@@ -191,7 +191,7 @@ class EventControllerIntegrationTest(
     test("should create a new event") {
         stubCreateTag("good")
         val response = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt {
                     it.claim("userId", testUserId)
                 })
@@ -227,7 +227,7 @@ class EventControllerIntegrationTest(
         val event = eventRepository.findAll().first { it.name == "testEvent" }
         val tagId = event.tags.first()
         mockMvc
-            .get("/api/events?tagIds=$tagId&page=0&size=3") {
+            .get("/api/v1/events?tagIds=$tagId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -242,7 +242,7 @@ class EventControllerIntegrationTest(
 
     test("should not list events because of wrong tag") {
         mockMvc
-            .get("/api/events?tagIds=${UUID.randomUUID()}&page=0&size=3") {
+            .get("/api/v1/events?tagIds=${UUID.randomUUID()}&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -255,7 +255,7 @@ class EventControllerIntegrationTest(
     test("should get event by id") {
         val eventId = eventRepository.findAll().first { it.name == "testEvent" }.id!!
         mockMvc
-            .get("/api/events/$eventId") {
+            .get("/api/v1/events/$eventId") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -269,7 +269,7 @@ class EventControllerIntegrationTest(
     test("should get event by slug") {
         val event = eventRepository.findAll().first { it.name == "testEvent" }
         mockMvc
-            .get("/api/events/${event.slug}") {
+            .get("/api/v1/events/${event.slug}") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -282,7 +282,7 @@ class EventControllerIntegrationTest(
     test("should allocate unique slug on name collision") {
         stubCreateTag("collision")
         mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt { it.claim("userId", testUserId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -308,7 +308,7 @@ class EventControllerIntegrationTest(
     test("should not list private events; direct access needs invite or creator") {
         val secretTagId = stubCreateTag("secret")
         val createResponse = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt { it.claim("userId", testUserId) })
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -338,7 +338,7 @@ class EventControllerIntegrationTest(
         val inviteToken = created.get("inviteToken").asText()
 
         mockMvc
-            .get("/api/events?tagIds=$secretTagId&page=0&size=10") {
+            .get("/api/v1/events?tagIds=$secretTagId&page=0&size=10") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -347,7 +347,7 @@ class EventControllerIntegrationTest(
             }
 
         mockMvc
-            .get("/api/events/$createdPrivateEventId") {
+            .get("/api/v1/events/$createdPrivateEventId") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -355,7 +355,7 @@ class EventControllerIntegrationTest(
             }
 
         mockMvc
-            .get("/api/events/$createdPrivateEventId") {
+            .get("/api/v1/events/$createdPrivateEventId") {
                 param("invite", inviteToken)
                 accept = APPLICATION_JSON
             }
@@ -366,7 +366,7 @@ class EventControllerIntegrationTest(
             }
 
         mockMvc
-            .get("/api/events/$createdPrivateEventId") {
+            .get("/api/v1/events/$createdPrivateEventId") {
                 with(jwt().jwt { it.claim("userId", testUserId) })
                 accept = APPLICATION_JSON
             }
@@ -378,7 +378,7 @@ class EventControllerIntegrationTest(
 
     test("should list events filtered by interest group id") {
         mockMvc
-            .get("/api/events?interestGroup=$testInterestGroupId&page=0&size=3") {
+            .get("/api/v1/events?interestGroup=$testInterestGroupId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -392,7 +392,7 @@ class EventControllerIntegrationTest(
     test("should list events filtered by event type") {
         stubCreateTag("spontaneous")
         mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt {
                     it.claim("userId", testUserId)
                 })
@@ -418,7 +418,7 @@ class EventControllerIntegrationTest(
             }
 
         mockMvc
-            .get("/api/events?eventType=SPONTANEOUS&page=0&size=10") {
+            .get("/api/v1/events?eventType=SPONTANEOUS&page=0&size=10") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -429,7 +429,7 @@ class EventControllerIntegrationTest(
             }
 
         mockMvc
-            .get("/api/events?eventType=REGULAR&page=0&size=10") {
+            .get("/api/v1/events?eventType=REGULAR&page=0&size=10") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -441,7 +441,7 @@ class EventControllerIntegrationTest(
     test("should not list events for non-matching interest group id") {
         val otherInterestGroupId = UUID.randomUUID()
         mockMvc
-            .get("/api/events?interestGroup=$otherInterestGroupId&page=0&size=3") {
+            .get("/api/v1/events?interestGroup=$otherInterestGroupId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -455,7 +455,7 @@ class EventControllerIntegrationTest(
         val event = eventRepository.findAll().first { it.name == "testEvent" }
         val tagId = event.tags.first()
         mockMvc
-            .get("/api/events?interestGroup=$testInterestGroupId&tagIds=$tagId&page=0&size=3") {
+            .get("/api/v1/events?interestGroup=$testInterestGroupId&tagIds=$tagId&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -468,7 +468,7 @@ class EventControllerIntegrationTest(
 
     test("should not list events when interest group id and tags do not match") {
         mockMvc
-            .get("/api/events?interestGroup=$testInterestGroupId&tagIds=${UUID.randomUUID()}&page=0&size=3") {
+            .get("/api/v1/events?interestGroup=$testInterestGroupId&tagIds=${UUID.randomUUID()}&page=0&size=3") {
                 accept = APPLICATION_JSON
             }
             .andDo { print() }
@@ -499,7 +499,7 @@ class EventControllerIntegrationTest(
             tagId = cookingTagId,
         )
         val response = mockMvc
-            .get("/api/events?match=true&tagIds=$hikingTagId") {
+            .get("/api/v1/events?match=true&tagIds=$hikingTagId") {
                 with(jwtFor(testUserId))
                 accept = APPLICATION_JSON
             }
@@ -529,7 +529,7 @@ class EventControllerIntegrationTest(
         )
 
         mockMvc
-            .get("/api/events?match=true&tagIds=$secretTagId") {
+            .get("/api/v1/events?match=true&tagIds=$secretTagId") {
                 with(jwtFor(testUserId))
                 accept = APPLICATION_JSON
             }
@@ -569,7 +569,7 @@ class EventControllerIntegrationTest(
             ),
         )
         val response = mockMvc
-            .get("/api/events?schedule=true&locationLabel=London") {
+            .get("/api/v1/events?schedule=true&locationLabel=London") {
                 with(jwtFor(testUserId))
                 accept = APPLICATION_JSON
             }
@@ -587,7 +587,7 @@ class EventControllerIntegrationTest(
         preparePersonalizedTest()
         stubCreateTag("yoga")
         val createResponse = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwtFor(testUserId))
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -627,7 +627,7 @@ class EventControllerIntegrationTest(
         preparePersonalizedTest()
         stubCreateTag("workshop")
         val createResponse = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwtFor(testUserId))
                 content = jsonMapper.writeValueAsString(
                     mapOf(
@@ -715,7 +715,7 @@ class EventControllerIntegrationTest(
             ),
         )
         val response = mockMvc
-            .get("/api/events?schedule=true&locationLabel=London") {
+            .get("/api/v1/events?schedule=true&locationLabel=London") {
                 with(jwtFor(testUserId))
                 accept = APPLICATION_JSON
             }
@@ -752,7 +752,7 @@ class EventControllerIntegrationTest(
         )
 
         mockMvc
-            .get("/api/events?tagIds=$tagId&page=0&size=10") {
+            .get("/api/v1/events?tagIds=$tagId&page=0&size=10") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -762,7 +762,7 @@ class EventControllerIntegrationTest(
             }
 
         mockMvc
-            .get("/api/events?past=true&tagIds=$tagId&page=0&size=10") {
+            .get("/api/v1/events?past=true&tagIds=$tagId&page=0&size=10") {
                 accept = APPLICATION_JSON
             }
             .andExpect {
@@ -772,7 +772,7 @@ class EventControllerIntegrationTest(
             }
 
         val mine = mockMvc
-            .get("/api/events?userId=$testUserId&page=0&size=10") {
+            .get("/api/v1/events?userId=$testUserId&page=0&size=10") {
                 with(jwtFor(testUserId))
                 accept = APPLICATION_JSON
             }
@@ -797,7 +797,7 @@ class EventControllerIntegrationTest(
         )
 
         val response = mockMvc
-            .get("/api/events?userId=$testUserId&page=0&size=10") {
+            .get("/api/v1/events?userId=$testUserId&page=0&size=10") {
                 with(jwtFor(otherUserId))
                 accept = APPLICATION_JSON
             }
@@ -824,7 +824,7 @@ class EventControllerIntegrationTest(
         )
 
         val response = mockMvc
-            .get("/api/events?userId=$testUserId&page=0&size=10") {
+            .get("/api/v1/events?userId=$testUserId&page=0&size=10") {
                 with(jwtFor(otherUserId))
                 accept = APPLICATION_JSON
             }

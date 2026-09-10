@@ -1,7 +1,7 @@
 package com.fancia.backend.event
 
 import com.fancia.backend.shared.event.core.entity.Event
-import com.fancia.backend.event.core.repository.EventOccurrenceRepository
+import com.fancia.backend.shared.event.core.repository.EventOccurrenceRepository
 import com.fancia.backend.event.core.repository.ReservationRepository
 import com.fancia.backend.event.mapper.toEntity
 import com.fancia.backend.shared.event.core.dto.EventResponse
@@ -44,7 +44,7 @@ class ReservationControllerIntegrationTest(
     fun stubCreateTag(name: String): UUID {
         val tagId = UUID.randomUUID()
         stubFor(
-            post(urlPathEqualTo("/api/tags"))
+            post(urlPathEqualTo("/api/v1/tags"))
                 .willReturn(
                     aResponse()
                         .withStatus(201)
@@ -83,7 +83,7 @@ class ReservationControllerIntegrationTest(
         val testInterestGroupId = UUID.randomUUID()
         stubCreateTag("good")
         val response = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt {
                     it.claim("userId", testUserId)
                 })
@@ -111,7 +111,7 @@ class ReservationControllerIntegrationTest(
         val createdEvent = response.toEvent(jsonMapper)
         val occurrenceId = firstOccurrenceId(createdEvent.id!!)
         mockMvc
-            .post("/api/events/{eventId}/occurrences/{occurrenceId}/reservations", createdEvent.id, occurrenceId) {
+            .post("/api/v1/events/{eventId}/occurrences/{occurrenceId}/reservations", createdEvent.id, occurrenceId) {
                 with(jwt().jwt {
                     it.claim("userId", testUserId)
                 })
@@ -135,7 +135,7 @@ class ReservationControllerIntegrationTest(
         found shouldBe true
 
         mockMvc.patch(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
             createdEvent.id,
             occurrenceId,
             testUserId,
@@ -158,7 +158,7 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.status", `is`("ACCEPTED"))
             }
         val testParticipantId = UUID.randomUUID()
-        mockMvc.post("/api/events/{eventId}/occurrences/{occurrenceId}/reservations", createdEvent.id, occurrenceId) {
+        mockMvc.post("/api/v1/events/{eventId}/occurrences/{occurrenceId}/reservations", createdEvent.id, occurrenceId) {
             with(jwt().jwt {
                 it.claim("userId", testParticipantId)
             })
@@ -176,7 +176,7 @@ class ReservationControllerIntegrationTest(
                 jsonPath("$.status", `is`("PAID"))
             }
 
-        mockMvc.get("/api/events/{eventId}/occurrences/{occurrenceId}/participants", createdEvent.id, occurrenceId) {
+        mockMvc.get("/api/v1/events/{eventId}/occurrences/{occurrenceId}/participants", createdEvent.id, occurrenceId) {
             with(jwt().jwt {
                 it.claim("userId", testUserId)
             })
@@ -189,7 +189,7 @@ class ReservationControllerIntegrationTest(
             }
 
         mockMvc.patch(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
             createdEvent.id,
             occurrenceId,
             testParticipantId,
@@ -219,7 +219,7 @@ class ReservationControllerIntegrationTest(
         val testInterestGroupId = UUID.randomUUID()
         stubCreateTag("rerequest")
         val response = mockMvc
-            .post("/api/events") {
+            .post("/api/v1/events") {
                 with(jwt().jwt {
                     it.claim("userId", hostUserId)
                 })
@@ -245,7 +245,7 @@ class ReservationControllerIntegrationTest(
         val occurrenceId = firstOccurrenceId(createdEvent.id!!)
 
         mockMvc
-            .post("/api/events/{eventId}/occurrences/{occurrenceId}/reservations", createdEvent.id, occurrenceId) {
+            .post("/api/v1/events/{eventId}/occurrences/{occurrenceId}/reservations", createdEvent.id, occurrenceId) {
                 with(jwt().jwt {
                     it.claim("userId", guestUserId)
                 })
@@ -259,7 +259,7 @@ class ReservationControllerIntegrationTest(
             }
 
         mockMvc.patch(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
             createdEvent.id,
             occurrenceId,
             guestUserId,
@@ -279,7 +279,7 @@ class ReservationControllerIntegrationTest(
             }
 
         mockMvc.patch(
-            "/api/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
+            "/api/v1/events/{eventId}/occurrences/{occurrenceId}/users/{userId}/reservations",
             createdEvent.id,
             occurrenceId,
             guestUserId,

@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*
 import java.util.*
 
 @RestController
-@RequestMapping("/api/events/{eventId}/posts")
+@RequestMapping("/api/v1/events/{eventId}/posts")
 @Tag(name = "Event Posts", description = "Posts on events (FEATURED status is the cover image)")
 @SecurityRequirement(name = "bearerAuth")
 class EventPostController(

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*
 import java.util.*
 
 @RestController
-@RequestMapping("/api/events/{eventId}/occurrences/{occurrenceId}/comments")
+@RequestMapping("/api/v1/events/{eventId}/occurrences/{occurrenceId}/comments")
 @Tag(name = "Event Occurrence Comments", description = "Comments on event occurrences")
 @SecurityRequirement(name = "bearerAuth")
 class EventCommentController(
