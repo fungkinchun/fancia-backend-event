@@ -27,6 +27,8 @@ interface ReservationRepository : JpaRepository<Reservation, ReservationId> {
 
     fun findByCheckInToken(checkInToken: String): Reservation?
 
+    fun findAllByIdUserId(userId: UUID): List<Reservation>
+
     fun findAllByIdOccurrenceIdAndStatus(
         occurrenceId: UUID,
         status: ReservationStatus,

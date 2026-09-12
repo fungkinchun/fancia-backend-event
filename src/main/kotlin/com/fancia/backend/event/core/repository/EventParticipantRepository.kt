@@ -32,4 +32,6 @@ interface EventParticipantRepository : JpaRepository<EventParticipant, EventPart
     ): Boolean
 
     fun existsByIdOccurrenceIdAndIdUserId(occurrenceId: UUID, userId: UUID): Boolean
+
+    fun findAllByIdUserId(userId: UUID): List<EventParticipant>
 }
